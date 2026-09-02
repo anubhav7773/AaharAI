@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/health_disclaimer_footer.dart';
+import '../../../core/auth/auth_state_provider.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isLoading = ref.watch(authLoadingProvider);
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -145,8 +148,13 @@ class WelcomeScreen extends StatelessWidget {
                         color: Colors.transparent,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(14),
-                          onTap: () {
-                            context.go('/scanner');
+                          onTap: isLoading ? null : () async {
+                            final success = await ref
+                                .read(authControllerProvider.notifier)
+                                .signInWithGoogle();
+                            if (success && context.mounted) {
+                              context.go('/scanner');
+                            }
                           },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -185,8 +193,13 @@ class WelcomeScreen extends StatelessWidget {
 
                     // Explore as Guest Text Button
                     TextButton(
-                      onPressed: () {
-                        context.go('/scanner');
+                      onPressed: isLoading ? null : () async {
+                        final success = await ref
+                            .read(authControllerProvider.notifier)
+                            .signInAsGuest();
+                        if (success && context.mounted) {
+                          context.go('/scanner');
+                        }
                       },
                       child: Text(
                         'Explore as Guest',
