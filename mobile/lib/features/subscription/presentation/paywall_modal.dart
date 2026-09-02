@@ -1,301 +1,130 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 
-class PaywallModal extends StatefulWidget {
+import '../../../core/billing/billing_service.dart';
+import '../../../core/billing/subscription_provider.dart';
+
+class PaywallModal extends ConsumerStatefulWidget {
   const PaywallModal({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const PaywallModal(),
+      builder: (_) => const PaywallModal(),
     );
   }
 
   @override
-  State<PaywallModal> createState() => _PaywallModalState();
+  ConsumerState<PaywallModal> createState() => _PaywallModalState();
 }
 
-class _PaywallModalState extends State<PaywallModal> {
-  int _selectedTier = 1; // 0: Weekly (₹29), 1: Monthly (₹89), 2: Annual (₹499)
+class _PaywallModalState extends ConsumerState<PaywallModal> {
+  String _selectedTierId = BillingService.monthlyPlanId;
+  bool _isProcessing = false;
 
-  final List<Map<String, dynamic>> _tiers = [
-    {
-      'title': 'Weekly Pass',
-      'price': '₹29',
-      'period': '/ week',
-      'subtitle': 'Trial tier • Cancel anytime',
-      'tag': 'TRIAL',
-    },
-    {
-      'title': 'Monthly Pro',
-      'price': '₹89',
-      'period': '/ month',
-      'subtitle': 'Most popular • ₹2.9/day',
-      'tag': 'MOST POPULAR',
-    },
-    {
-      'title': 'Annual Elite',
-      'price': '₹499',
-      'period': '/ year',
-      'subtitle': 'Save 54% • ₹41/month',
-      'tag': 'SAVE 54%',
-    },
-  ];
+  Future<void> _checkout() async {
+    final billing = ref.read(billingServiceProvider);
+    final products = ref.read(subscriptionProductsProvider).valueOrNull ?? [];
+    final product = _findProduct(products);
+    if (product == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Plans are currently unavailable.')),
+      );
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    try {
+      final initiated = await billing.buySubscription(product);
+      if (!initiated && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment initiation cancelled.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  ProductDetails? _findProduct(List<ProductDetails> products) {
+    for (final product in products) {
+      if (product.id == _selectedTierId) return product;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final pro = ref.watch(isProUserProvider).valueOrNull ?? false;
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       child: SafeArea(
-        top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Draggable pill handle
               Container(
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AaharTheme.borderGrey,
+                  color: const Color(0xFFE5E7EB),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-
               const SizedBox(height: 20),
-
-              // Header Badge & Title
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.workspace_premium_rounded,
-                      color: Color(0xFFD97706),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'UPGRADE TO AAHARAI PRO',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: const Color(0xFFB45309),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
+              const Text('AaharAi Pro Access',
+                  style: TextStyle(
+                      color: Color(0xFF1B5E20),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-
-              Text(
-                'Complete Nutritional Freedom',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                  color: AaharTheme.textHeadline,
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              Text(
-                'Deconstruct unlimited ingredient labels, uncover hidden additives, and access ICMR-NIN street baselines with zero ads.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  height: 1.4,
-                  color: AaharTheme.textMuted,
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // Value Checklist
-              _buildChecklistItem('Unlimited Gemini 2.5 Flash label OCR photo scans'),
-              _buildChecklistItem('FSSAI chemical additive safety badges (Safe/Moderate/Avoid)'),
-              _buildChecklistItem('ICMR-NIN IFCT street food database & reused oil alerts'),
-              _buildChecklistItem('100% Ad-Free & priority server cold-start acceleration'),
-
-              const SizedBox(height: 20),
-
-              // Plan Cards
-              ...List.generate(_tiers.length, (index) {
-                final tier = _tiers[index];
-                final isSelected = _selectedTier == index;
-
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedTier = index),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AaharTheme.primarySurface
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isSelected
-                            ? AaharTheme.primaryGreen
-                            : AaharTheme.borderGrey,
-                        width: isSelected ? 2 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  tier['title'] as String,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: AaharTheme.textHeadline,
-                                  ),
-                                ),
-                                if (tier['tag'] != null) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isSelected
-                                          ? AaharTheme.primaryGreen
-                                          : const Color(0xFFD97706),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      tier['tag'] as String,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              tier['subtitle'] as String,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: AaharTheme.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              tier['price'] as String,
-                              style: GoogleFonts.inter(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: isSelected
-                                    ? AaharTheme.primaryGreen
-                                    : AaharTheme.textHeadline,
-                              ),
-                            ),
-                            Text(
-                              tier['period'] as String,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: AaharTheme.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-
+              const Text('Know Every Molecule You Eat',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF111827))),
               const SizedBox(height: 8),
-
-              // Checkout CTA Button
-              ElevatedButton(
-                onPressed: () {
-                  final selected = _tiers[_selectedTier];
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      backgroundColor: AaharTheme.primaryGreen,
-                      content: Text(
-                        'Connecting to Google Play Billing for ${selected['title']} (${selected['price']})...',
-                      ),
-                    ),
-                  );
-                  Navigator.pop(context);
-                },
-                child: Text('Continue with Google Play (${_tiers[_selectedTier]['price']})'),
+              Text(
+                pro
+                    ? 'Your Pro access is active.'
+                    : 'Unlock unlimited scans, instant OCR analysis, and an ad-free experience.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13.5, color: Color(0xFF6B7280)),
               ),
-
-              const SizedBox(height: 12),
-
-              // Terms & Privacy Links
+              const SizedBox(height: 24),
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      'Terms of Service',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: AaharTheme.textMuted,
-                      ),
-                    ),
-                  ),
-                  const Text('•', style: TextStyle(color: AaharTheme.textLight)),
-                  TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      'Privacy Policy',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: AaharTheme.textMuted,
-                      ),
-                    ),
-                  ),
-                  const Text('•', style: TextStyle(color: AaharTheme.textLight)),
-                  TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      'Restore Purchases',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: AaharTheme.textMuted,
-                      ),
-                    ),
-                  ),
+                  _tier(BillingService.weeklyPlanId, 'Weekly', '₹29', '/week'),
+                  const SizedBox(width: 10),
+                  _tier(BillingService.monthlyPlanId, 'Monthly', '₹89', '/month',
+                      popular: true),
+                  const SizedBox(width: 10),
+                  _tier(BillingService.annualPlanId, 'Annual', '₹499', '/year'),
                 ],
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isProcessing || pro ? null : _checkout,
+                  child: _isProcessing
+                      ? const CircularProgressIndicator()
+                      : const Text('Continue with Google Play'),
+                ),
+              ),
+              TextButton(
+                onPressed: _isProcessing
+                    ? null
+                    : () => ref.read(billingServiceProvider).restorePurchases(),
+                child: const Text('Restore Purchases'),
               ),
             ],
           ),
@@ -304,29 +133,42 @@ class _PaywallModalState extends State<PaywallModal> {
     );
   }
 
-  Widget _buildChecklistItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.check_circle_rounded,
-            color: AaharTheme.safeGreen,
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AaharTheme.textBody,
-              ),
+  Widget _tier(String id, String title, String price, String period,
+      {bool popular = false}) {
+    final selected = _selectedTierId == id;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTierId = id),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFFE8F5E9) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFF1B5E20)
+                  : const Color(0xFFE5E7EB),
+              width: selected ? 2 : 1,
             ),
           ),
-        ],
+          child: Column(
+            children: [
+              Text(title, style: const TextStyle(fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(price,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(period,
+                  style: const TextStyle(fontSize: 10, color: Colors.grey)),
+              if (popular)
+                const Text('Popular',
+                    style: TextStyle(
+                        fontSize: 9,
+                        color: Color(0xFF1B5E20),
+                        fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
       ),
     );
   }
