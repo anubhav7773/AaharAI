@@ -1,0 +1,21 @@
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Python environments and generated files
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Flutter/Dart generated files
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/ios/Flutter/ephemeral/
+
+# Local IDE files
+.idea/
+.vscode/

@@ -1,0 +1,51 @@
+{
+  "theme": "AaharAi Clinical Organic Design System",
+  "projectId": "3588503507808717469",
+  "colors": {
+    "primary": "#1B5E20",
+    "primary_surface": "#E8F5E9",
+    "background": "#F8FAF9",
+    "surface": "#FFFFFF",
+    "surface_container_low": "#F2F4F3",
+    "surface_container": "#ECEEED",
+    "surface_container_high": "#E6E9E8",
+    "on_surface": "#191C1C",
+    "text_headline": "#111827",
+    "text_body": "#374151",
+    "text_muted": "#6B7280",
+    "text_light": "#9CA3AF",
+    "border_grey": "#E5E7EB",
+    "outline_variant": "#C0C9BB",
+    "safety": {
+      "safe_text": "#16A34A",
+      "safe_bg": "#DCFCE7",
+      "moderate_text": "#D97706",
+      "moderate_bg": "#FEF3C7",
+      "avoid_text": "#DC2626",
+      "avoid_bg": "#FEE2E2"
+    },
+    "macros": {
+      "calories": "#EA580C",
+      "protein": "#0284C7",
+      "carbs": "#F59E0B",
+      "fat": "#8B5CF6"
+    }
+  },
+  "typography": {
+    "fontFamily": "Inter",
+    "display_lg": {"fontSize": 32, "fontWeight": 700, "letterSpacing": -0.5},
+    "headline_lg": {"fontSize": 24, "fontWeight": 700, "letterSpacing": -0.2},
+    "headline_md": {"fontSize": 20, "fontWeight": 600},
+    "body_lg": {"fontSize": 16, "fontWeight": 400},
+    "body_md": {"fontSize": 14, "fontWeight": 400},
+    "label_lg": {"fontSize": 14, "fontWeight": 600},
+    "label_md": {"fontSize": 12, "fontWeight": 500},
+    "label_sm": {"fontSize": 11, "fontWeight": 500}
+  },
+  "shapes": {
+    "badge_radius": 100.0,
+    "card_radius": 16.0,
+    "sheet_radius": 28.0,
+    "button_radius": 14.0
+  }
+}

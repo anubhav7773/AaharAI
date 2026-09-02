@@ -1,0 +1,74 @@
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;overflow-x:hidden;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{"colors":{"outline-variant":"#c0c9bb","background":"#f8faf9","on-primary-container":"#90d689","surface-container":"#eceeed","on-error":"#ffffff","on-primary-fixed":"#002203","secondary-container":"#d9e6da","on-background":"#191c1c","primary-fixed-dim":"#91d78a","primary":"#00450d","tertiary":"#6b1d3d","on-tertiary-fixed-variant":"#7a2949","on-secondary-container":"#5b675e","on-secondary":"#ffffff","surface-container-lowest":"#ffffff","on-secondary-fixed-variant":"#3e4a41","on-surface-variant":"#41493e","primary-fixed":"#acf4a4","tertiary-fixed":"#ffd9e2","secondary":"#556158","surface":"#f8faf9","error-container":"#ffdad6","surface-dim":"#d8dada","error":"#ba1a1a","surface-container-low":"#f2f4f3","on-primary":"#ffffff","on-secondary-fixed":"#131e17","surface-variant":"#e1e3e2","surface-container-high":"#e6e9e8","on-primary-fixed-variant":"#0c5216","on-tertiary-container":"#ffaec6","outline":"#717a6d","secondary-fixed-dim":"#bdcabe","primary-container":"#1b5e20","surface-container-highest":"#e1e3e2","inverse-primary":"#91d78a","inverse-on-surface":"#eff1f0","on-error-container":"#93000a","secondary-fixed":"#d9e6da","on-tertiary-fixed":"#3e001d","tertiary-container":"#883454","inverse-surface":"#2e3131","on-surface":"#191c1c","tertiary-fixed-dim":"#ffb1c8","surface-tint":"#2a6b2c","on-tertiary":"#ffffff","surface-bright":"#f8faf9"},"borderRadius":{"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},"spacing":{"lg":"24px","xs":"4px","unit":"8px","sm":"8px","margin-mobile":"16px","xl":"32px","md":"16px","gutter-mobile":"16px"},"fontFamily":{"label-md":["Inter"],"body-md":["Inter"],"headline-lg":["Inter"],"headline-md":["Inter"],"label-lg":["Inter"],"headline-lg-mobile":["Inter"],"body-lg":["Inter"],"display-lg":["Inter"]},"fontSize":{"label-md":["12px",{"lineHeight":"16px","letterSpacing":"0.02em","fontWeight":"500"}],"body-md":["14px",{"lineHeight":"20px","fontWeight":"400"}],"headline-lg":["24px",{"lineHeight":"32px","letterSpacing":"-0.01em","fontWeight":"700"}],"headline-md":["20px",{"lineHeight":"28px","fontWeight":"600"}],"label-lg":["14px",{"lineHeight":"20px","letterSpacing":"0.01em","fontWeight":"600"}],"headline-lg-mobile":["22px",{"lineHeight":"28px","fontWeight":"700"}],"body-lg":["16px",{"lineHeight":"24px","fontWeight":"400"}],"display-lg":["32px",{"lineHeight":"40px","letterSpacing":"-0.02em","fontWeight":"700"}]}}}}</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head><body class="bg-surface font-body-md text-on-surface flex flex-col min-h-screen"><main class="flex-grow bg-surface"><div class="flex flex-col w-full h-[884px] relative overflow-hidden bg-black text-white">
+<!-- Simulated Live Camera Feed Background -->
+<div class="absolute inset-0 z-0 bg-cover bg-center" data-alt="A blurred, slightly out-of-focus close-up of a vibrant, organic grocery store aisle. There are fresh green produce, rustic wooden crates, and soft natural lighting. The scene is slightly darker to represent a camera viewfinder background in a modern health app." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDwnO4bTtrWdGMwlCgxF7gX_hJwSzdRnmLLoi51aX2DiWvYmgqyiktLYQAWkca4NdoNaY5eiigepxh0UWvAbZOQeiLIaH3Ld9REkxkV9y_FEWzK-uhICqroGCF6CwtGkhenwIjHrSVhU-PsvsKTHVd0GC77mHXQLoa5jGRsrpTEgRTg9jHFJ19GO7EdD-o-8W1OIaYAVtENT3V78oyf2wMgx3OXGmSho_vQGb6kSH-C3P2sTQosk3IW')"></div>
+<!-- Dark Scrim for readability -->
+<div class="absolute inset-0 z-10 bg-black/45 backdrop-blur-[2px]"></div>
+<!-- Main Content Layer -->
+<div class="relative z-20 flex flex-col h-full w-full justify-between pb-safe pt-safe">
+<!-- Top Bar -->
+<div class="flex flex-row justify-between items-center px-lg pt-lg w-full">
+<button aria-label="Go back" class="w-12 h-12 flex items-center justify-center rounded-full bg-white/20 backdrop-blur-md transition-transform active:scale-95">
+<span class="material-symbols-outlined text-white text-[24px]">arrow_back</span>
+</button>
+<button aria-label="Toggle flashlight" class="w-12 h-12 flex items-center justify-center rounded-full bg-white/20 backdrop-blur-md transition-transform active:scale-95">
+<span class="material-symbols-outlined text-white text-[24px]">flashlight_on</span>
+</button>
+</div>
+<!-- Center Content (Viewfinder area) -->
+<div class="flex flex-col items-center justify-center flex-grow px-lg space-y-xl">
+<!-- Mode Selector -->
+<div class="flex p-1 bg-black/40 backdrop-blur-md rounded-full shadow-lg">
+<button class="px-6 py-2.5 rounded-full bg-white text-on-surface font-label-lg transition-colors">
+          Barcode Scan
+        </button>
+<button class="px-6 py-2.5 rounded-full text-white/80 font-label-lg transition-colors hover:text-white">
+          Label OCR
+        </button>
+</div>
+<!-- Viewfinder Container -->
+<div class="relative w-[280px] h-[280px]">
+<!-- Corner Brackets -->
+<div class="absolute top-0 left-0 w-12 h-12 border-t-[3.5px] border-l-[3.5px] border-[#22C55E] rounded-tl-[24px]"></div>
+<div class="absolute top-0 right-0 w-12 h-12 border-t-[3.5px] border-r-[3.5px] border-[#22C55E] rounded-tr-[24px]"></div>
+<div class="absolute bottom-0 left-0 w-12 h-12 border-b-[3.5px] border-l-[3.5px] border-[#22C55E] rounded-bl-[24px]"></div>
+<div class="absolute bottom-0 right-0 w-12 h-12 border-b-[3.5px] border-r-[3.5px] border-[#22C55E] rounded-br-[24px]"></div>
+<!-- Viewfinder cutout effect (slightly brighter center) -->
+<div class="absolute inset-[3.5px] rounded-[20px] bg-white/5 backdrop-blur-sm overflow-hidden">
+<!-- Animated Laser Line Shader -->
+
+</div>
+</div>
+<!-- Instruction Badge -->
+<div class="px-4 py-2 bg-black/60 backdrop-blur-md rounded-full">
+<p class="font-label-md text-white/90 text-center tracking-wide">
+          Align barcode or ingredient list within frame
+        </p>
+</div>
+</div>
+<!-- Bottom Control Dock -->
+<div class="w-full bg-surface text-on-surface rounded-t-[28px] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-lg py-xl pb-[calc(32px+env(safe-area-inset-bottom,0px))] flex flex-row items-center justify-between">
+<!-- Gallery Button -->
+<button class="flex flex-col items-center justify-center space-y-2 w-[72px] h-[72px] rounded-2xl bg-surface-container-low transition-transform active:scale-95">
+<span class="material-symbols-outlined text-on-surface-variant text-[28px]">photo_library</span>
+<span class="font-label-md text-on-surface-variant">Gallery</span>
+</button>
+<!-- Center Status -->
+<div class="flex flex-col items-center justify-center space-y-1">
+<div class="h-1.5 w-1.5 rounded-full bg-[#22C55E] animate-pulse mb-1 shadow-[0_0_8px_#22C55E]"></div>
+<p class="font-label-lg text-primary">Auto-scanning active...</p>
+</div>
+<!-- Street Food Button -->
+<button class="flex flex-col items-center justify-center space-y-2 w-[72px] h-[72px] rounded-2xl bg-surface-container-low transition-transform active:scale-95">
+<span class="material-symbols-outlined text-on-surface-variant text-[28px]">ramen_dining</span>
+<span class="font-label-md text-on-surface-variant">Manual</span>
+</button>
+</div>
+</div>
+</div></main></body></html>
