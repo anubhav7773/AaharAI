@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.health_claim_filter import HealthClaimMiddleware
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -13,6 +14,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.add_middleware(HealthClaimMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],

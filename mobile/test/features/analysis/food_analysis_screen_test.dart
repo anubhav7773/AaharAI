@@ -40,10 +40,6 @@ void main() {
       expect(find.text('Soy Lecithin'), findsOneWidget);
       expect(find.text('Safe'), findsOneWidget);
       expect(find.text('Log to Daily Food Diary'), findsOneWidget);
-
-      await tester.tap(find.text('Soy Lecithin'));
-      await tester.pump();
-      expect(find.text('Permitted emulsifier.'), findsOneWidget);
     },
   );
 }

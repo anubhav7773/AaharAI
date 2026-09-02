@@ -5,21 +5,25 @@ class AppEnv {
   final String apiBaseUrl;
   final String supabaseUrl;
   final String supabaseAnonKey;
+  final String privacyPolicyUrl;
 
   const AppEnv({
     required this.apiBaseUrl,
     required this.supabaseUrl,
     required this.supabaseAnonKey,
+    this.privacyPolicyUrl = 'https://asiverticals.me/aaharai/privacy',
   });
 
   const AppEnv.forTesting({
     required String apiBaseUrl,
     required String supabaseUrl,
     required String supabaseAnonKey,
+    String privacyPolicyUrl = 'https://asiverticals.me/aaharai/privacy',
   }) : this(
           apiBaseUrl: apiBaseUrl,
           supabaseUrl: supabaseUrl,
           supabaseAnonKey: supabaseAnonKey,
+          privacyPolicyUrl: privacyPolicyUrl,
         );
 
   static AppEnv fromEnvironment() => const AppEnv(
@@ -29,6 +33,10 @@ class AppEnv {
         ),
         supabaseUrl: String.fromEnvironment('SUPABASE_URL'),
         supabaseAnonKey: String.fromEnvironment('SUPABASE_ANON_KEY'),
+        privacyPolicyUrl: String.fromEnvironment(
+          'PRIVACY_POLICY_URL',
+          defaultValue: 'https://asiverticals.me/aaharai/privacy',
+        ),
       );
 
   AppEnv validate() {

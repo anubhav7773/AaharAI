@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 
 from app.schemas.food import GeminiFoodExtractionSchema
+from app.core.health_claim_filter import health_claim_sanitizer
 from app.services.cache_service import cache_service
 from app.services.gemini_service import gemini_service
 from app.services.off_service import off_service
@@ -18,7 +19,7 @@ async def scan_barcode(barcode: str) -> dict:
     clean_barcode = barcode.strip()
     cached = await cache_service.get_by_barcode(clean_barcode)
     if cached:
-        return cached
+        return health_claim_sanitizer.sanitize_food_payload(cached)
 
     product = await off_service.fetch_product_by_barcode(clean_barcode)
     if not product:
@@ -45,7 +46,9 @@ async def scan_barcode(barcode: str) -> dict:
         except Exception:
             logger.exception("Gemini enrichment failed; returning OFF data")
 
-    return await cache_service.save_to_cache(product)
+    return health_claim_sanitizer.sanitize_food_payload(
+        await cache_service.save_to_cache(product)
+    )
 
 
 @router.post("/vision", response_model=dict)
@@ -82,23 +85,26 @@ async def scan_label_vision(file: UploadFile = File(...)) -> dict:
     signature = cache_service.generate_signature_hash(raw_names or extracted.food_name)
     cached = await cache_service.get_by_signature_hash(signature)
     if cached:
-        return cached
+        return health_claim_sanitizer.sanitize_food_payload(cached)
 
-    return await cache_service.save_to_cache(
-        {
-            "signature_hash": signature,
-            "food_name": extracted.food_name,
-            "brand_name": extracted.brand_name,
-            "source": "gemini_vision",
-            "serving_size": extracted.serving_size,
-            "ingredients_raw": raw_names,
-            "parsed_ingredients": [
-                ingredient.model_dump() for ingredient in extracted.parsed_ingredients
-            ],
-            "nutrients": extracted.nutrients.model_dump(),
-            "allergens": extracted.allergens,
-            "preparation_insights": extracted.preparation_insights,
-        }
+    return health_claim_sanitizer.sanitize_food_payload(
+        await cache_service.save_to_cache(
+            {
+                "signature_hash": signature,
+                "food_name": extracted.food_name,
+                "brand_name": extracted.brand_name,
+                "source": "gemini_vision",
+                "serving_size": extracted.serving_size,
+                "ingredients_raw": raw_names,
+                "parsed_ingredients": [
+                    ingredient.model_dump()
+                    for ingredient in extracted.parsed_ingredients
+                ],
+                "nutrients": extracted.nutrients.model_dump(),
+                "allergens": extracted.allergens,
+                "preparation_insights": extracted.preparation_insights,
+            }
+        )
     )
 
 
@@ -109,7 +115,7 @@ async def get_street_food_analysis(
     clean_name = dish_name.strip()
     cached = await cache_service.search_street_food(clean_name, limit=1)
     if cached:
-        return cached[0]
+        return health_claim_sanitizer.sanitize_food_payload(cached[0])
 
     try:
         inferred = await gemini_service.estimate_street_food(clean_name)
@@ -120,21 +126,25 @@ async def get_street_food_analysis(
             detail="Unable to analyze street dish at this moment.",
         ) from exc
 
-    return await cache_service.save_to_cache(
-        {
-            "signature_hash": cache_service.generate_signature_hash(clean_name),
-            "food_name": inferred.food_name,
-            "brand_name": "Indian Street Vendor / Unpacked",
-            "source": "street_food",
-            "serving_size": inferred.serving_size or "1 serving / standard plate",
-            "ingredients_raw": ", ".join(
-                ingredient.name for ingredient in inferred.parsed_ingredients
-            ),
-            "parsed_ingredients": [
-                ingredient.model_dump() for ingredient in inferred.parsed_ingredients
-            ],
-            "nutrients": inferred.nutrients.model_dump(),
-            "allergens": inferred.allergens,
-            "preparation_insights": inferred.preparation_insights,
-        }
+    return health_claim_sanitizer.sanitize_food_payload(
+        await cache_service.save_to_cache(
+            {
+                "signature_hash": cache_service.generate_signature_hash(clean_name),
+                "food_name": inferred.food_name,
+                "brand_name": "Indian Street Vendor / Unpacked",
+                "source": "street_food",
+                "serving_size": inferred.serving_size
+                or "1 serving / standard plate",
+                "ingredients_raw": ", ".join(
+                    ingredient.name for ingredient in inferred.parsed_ingredients
+                ),
+                "parsed_ingredients": [
+                    ingredient.model_dump()
+                    for ingredient in inferred.parsed_ingredients
+                ],
+                "nutrients": inferred.nutrients.model_dump(),
+                "allergens": inferred.allergens,
+                "preparation_insights": inferred.preparation_insights,
+            }
+        )
     )
