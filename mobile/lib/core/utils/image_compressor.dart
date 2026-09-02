@@ -1,32 +1,42 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
 class ImageCompressor {
-  /// Preprocesses camera pictures to enforce maximum dimension boundaries (1024x1024),
-  /// capping Gemini token consumption while maintaining OCR text legibility (Doc_08).
-  static Future<File> compressForGemini(File rawFile) async {
-    final bytes = await rawFile.readAsBytes();
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) return rawFile;
+  static Future<Uint8List> compressForVision(Uint8List rawBytes) async {
+    img.Image? decoded;
+    try {
+      decoded = img.decodeImage(rawBytes);
+    } on Object catch (error) {
+      throw FormatException('Failed to decode captured image.', error);
+    }
+    if (decoded == null) {
+      throw const FormatException('Failed to decode captured image.');
+    }
 
-    // Constrain resolution boundaries to 1024px maximum edge
-    img.Image resized = decoded;
+    var resized = decoded;
     if (decoded.width > 1024 || decoded.height > 1024) {
       resized = img.copyResize(
         decoded,
-        width: decoded.width > decoded.height ? 1024 : null,
-        height: decoded.height >= decoded.width ? 1024 : null,
+        width: decoded.width >= decoded.height ? 1024 : null,
+        height: decoded.height > decoded.width ? 1024 : null,
         interpolation: img.Interpolation.average,
       );
     }
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 80));
+  }
 
-    final compressedBytes = img.encodeJpg(resized, quality: 80);
+  /// Preprocesses camera pictures to enforce maximum dimension boundaries (1024x1024),
+  /// capping Gemini token consumption while maintaining OCR text legibility (Doc_08).
+  static Future<File> compressForGemini(File rawFile) async {
+    final compressedBytes =
+        await compressForVision(await rawFile.readAsBytes());
     final tempDir = await getTemporaryDirectory();
-    final targetPath = '${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final targetFile = File(targetPath);
+    final targetFile = File(
+      '${tempDir.path}/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg',
+    );
     await targetFile.writeAsBytes(compressedBytes);
-
     return targetFile;
   }
 }
