@@ -29,4 +29,4 @@ services:
       - key: OFF_TIMEOUT_SECONDS
         value: "6.0"
       - key: BACKEND_CORS_ORIGINS
-        value: '["*"]'
+        value: '["https://asiverticals.me"]'
