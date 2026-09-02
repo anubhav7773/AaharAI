@@ -45,6 +45,13 @@ class Settings(BaseSettings):
             return value
         raise ValueError(value)
 
+    @field_validator("GEMINI_API_KEY", "SUPABASE_SERVICE_ROLE_KEY")
+    @classmethod
+    def validate_secret(cls, value: SecretStr) -> SecretStr:
+        if not value.get_secret_value().strip():
+            raise ValueError("credential must not be empty")
+        return value
+
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_ENV_FILE),
         env_file_encoding="utf-8",
@@ -57,3 +64,6 @@ def get_settings() -> Settings:
     """Return the validated, process-wide settings instance."""
 
     return Settings()
+
+
+settings = get_settings()
