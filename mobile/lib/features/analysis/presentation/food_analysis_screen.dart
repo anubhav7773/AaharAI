@@ -7,8 +7,8 @@ import '../models/food_analysis_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/macro_pill_card.dart';
 import '../../../shared/widgets/allergen_alert_card.dart';
-import '../../../shared/widgets/safety_badge.dart';
 import '../../../shared/widgets/health_disclaimer_footer.dart';
+import 'widgets/molecule_card.dart';
 
 class FoodAnalysisScreen extends StatefulWidget {
   final FoodAnalysisResponse? analysis;
@@ -26,7 +26,6 @@ class FoodAnalysisScreen extends StatefulWidget {
 
 class _FoodAnalysisScreenState extends State<FoodAnalysisScreen> {
   late FoodAnalysisResponse _data;
-  final Set<int> _expandedIndices = {};
 
   @override
   void initState() {
@@ -387,83 +386,7 @@ class _FoodAnalysisScreenState extends State<FoodAnalysisScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final item = _data.ingredients[index];
-              final isExpanded = _expandedIndices.contains(index);
-
-              IngredientSafety safety;
-              switch (item.category) {
-                case SafetyCategory.safe:
-                  safety = IngredientSafety.safe;
-                  break;
-                case SafetyCategory.moderate:
-                  safety = IngredientSafety.moderate;
-                  break;
-                case SafetyCategory.avoid:
-                  safety = IngredientSafety.avoid;
-                  break;
-              }
-
-              return Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AaharTheme.borderGrey),
-                ),
-                child: Theme(
-                  data: Theme.of(context).copyWith(
-                    dividerColor: Colors.transparent,
-                  ),
-                  child: ExpansionTile(
-                    initiallyExpanded: isExpanded,
-                    onExpansionChanged: (expanded) {
-                      setState(() {
-                        if (expanded) {
-                          _expandedIndices.add(index);
-                        } else {
-                          _expandedIndices.remove(index);
-                        }
-                      });
-                    },
-                    title: Text(
-                      item.name,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AaharTheme.textHeadline,
-                      ),
-                    ),
-                    trailing: SafetyBadge(safety: safety),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.simpleExplanation,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                height: 1.4,
-                                color: AaharTheme.textBody,
-                              ),
-                            ),
-                            if (item.healthNote.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                item.healthNote,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontStyle: FontStyle.italic,
-                                  color: AaharTheme.textMuted,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
+              return MoleculeCard(molecule: item);
             },
           ),
       ],
