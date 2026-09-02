@@ -7,9 +7,9 @@
 
 ### Environment and Configuration
 
-- [ ] **CONF-01**: Backend loads required Gemini and Supabase settings from `backend/.env` through Pydantic Settings and fails loudly when required values are missing.
-- [ ] **CONF-02**: Backend `.env` and mobile `.env` files are ignored by git and contain safe placeholder configuration templates.
-- [ ] **CONF-03**: Mobile API and Supabase public settings are supplied through `--dart-define` with documented defaults and validation.
+- [x] **CONF-01**: Backend loads required Gemini and Supabase settings from `backend/.env` through Pydantic Settings and fails loudly when required values are missing.
+- [x] **CONF-02**: Backend `.env` and mobile `.env` files are ignored by git and contain safe placeholder configuration templates.
+- [x] **CONF-03**: Mobile API and Supabase public settings are supplied through `--dart-define` with documented defaults and validation.
 
 ### Backend Platform
 
@@ -64,9 +64,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONF-01 | Phase 1 | Pending |
-| CONF-02 | Phase 1 | Pending |
-| CONF-03 | Phase 1 | Pending |
+| CONF-01 | Phase 1 | Complete |
+| CONF-02 | Phase 1 | Complete |
+| CONF-03 | Phase 1 | Complete |
 | BACK-01 | Phase 2 | Pending |
 | BACK-02 | Phase 2 | Pending |
 | BACK-03 | Phase 2 | Pending |
@@ -86,6 +86,7 @@
 | REL-04 | Phase 9 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 20 total
 - Mapped to phases: 20
 - Unmapped: 0
