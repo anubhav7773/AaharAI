@@ -36,7 +36,11 @@ quota safeguards, safety language, and platform policy.
   1. Starting the backend with missing required Gemini or Supabase settings fails with a clear configuration error, while valid `backend/.env` values load through Pydantic Settings.
   2. Backend and mobile environment files are ignored by git, and safe placeholder templates explain which values are required without exposing secrets.
   3. A mobile build can select the backend URL and Supabase public settings through `--dart-define`, applies documented defaults where allowed, and rejects invalid required values.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Establish validated Pydantic backend settings and secret-file hygiene
+- [ ] 01-02-PLAN.md — Inject and validate mobile build-time configuration
 
 ### Phase 2: FastAPI Platform and Contracts
 **Goal**: A deployable FastAPI service presents a stable versioned API boundary with authenticated requests, bounded inputs, typed results, and consistent errors.
@@ -154,7 +158,7 @@ Phase 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Environment and Configuration Foundation | 0/TBD | Not started | - |
+| 1. Environment and Configuration Foundation | 0/2 | Not started | - |
 | 2. FastAPI Platform and Contracts | 0/TBD | Not started | - |
 | 3. Supabase Schema and Cache | 0/TBD | Not started | - |
 | 4. Food Intelligence Pipelines | 0/TBD | Not started | - |
