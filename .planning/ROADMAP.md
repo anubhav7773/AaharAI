@@ -51,7 +51,7 @@ Plans:
   2. A valid Firebase identity token is accepted for protected requests, while missing or invalid tokens receive a safe authentication error without leaking internals.
   3. Barcode, vision, and street-food responses validate against concrete Pydantic contracts containing typed nutrients, ingredients, allergens, source, and preparation insights.
   4. Invalid barcodes, unsupported or oversized uploads, upstream failures, rate limits, and unexpected exceptions resolve to documented HTTP statuses and user-safe messages.
-**Plans**: TBD
+**Plans**: 2 plans
 
 ### Phase 3: Supabase Schema and Cache
 **Goal**: The service has safe, quota-conscious persistence for profiles and globally reusable food analyses.
