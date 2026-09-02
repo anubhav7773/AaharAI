@@ -1,42 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import 'diary_controller.dart';
 
-class DailyDiaryScreen extends StatefulWidget {
+class DailyDiaryScreen extends ConsumerStatefulWidget {
   const DailyDiaryScreen({super.key});
 
   @override
-  State<DailyDiaryScreen> createState() => _DailyDiaryScreenState();
+  ConsumerState<DailyDiaryScreen> createState() => _DailyDiaryScreenState();
 }
 
-class _DailyDiaryScreenState extends State<DailyDiaryScreen> {
-  DateTime _selectedDate = DateTime.now();
-
+class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
   final List<Map<String, dynamic>> _meals = [
     {
       'mealType': 'Breakfast',
       'items': [
-        {'name': '2 Whole Wheat Roti + Dal', 'calories': 310, 'time': '8:30 AM'},
-        {'name': 'Masala Chai (with 1 tsp sugar)', 'calories': 75, 'time': '8:45 AM'},
+        {
+          'name': '2 Whole Wheat Roti + Dal',
+          'calories': 310,
+          'time': '8:30 AM'
+        },
+        {
+          'name': 'Masala Chai (with 1 tsp sugar)',
+          'calories': 75,
+          'time': '8:45 AM'
+        },
       ],
     },
     {
       'mealType': 'Lunch',
       'items': [
-        {'name': 'Steamed Rice + Paneer Curry + Salad', 'calories': 560, 'time': '1:15 PM'},
+        {
+          'name': 'Steamed Rice + Paneer Curry + Salad',
+          'calories': 560,
+          'time': '1:15 PM'
+        },
       ],
     },
     {
       'mealType': 'Snacks',
       'items': [
-        {'name': 'Marie Gold Biscuits (Scanned)', 'calories': 135, 'time': '4:45 PM'},
-        {'name': 'Roasted Makhana (Foxnuts)', 'calories': 95, 'time': '5:00 PM'},
+        {
+          'name': 'Marie Gold Biscuits (Scanned)',
+          'calories': 135,
+          'time': '4:45 PM'
+        },
+        {
+          'name': 'Roasted Makhana (Foxnuts)',
+          'calories': 95,
+          'time': '5:00 PM'
+        },
       ],
     },
     {
       'mealType': 'Dinner',
       'items': [
-        {'name': 'Veg Steamed Momos (6 pcs)', 'calories': 245, 'time': '8:15 PM'},
+        {
+          'name': 'Veg Steamed Momos (6 pcs)',
+          'calories': 245,
+          'time': '8:15 PM'
+        },
       ],
     },
   ];
@@ -56,7 +81,18 @@ class _DailyDiaryScreenState extends State<DailyDiaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final diaryState = ref.watch(diaryControllerProvider);
+    ref.listen(diaryControllerProvider, (previous, next) {
+      if (next.errorMessage != null &&
+          next.errorMessage != previous?.errorMessage &&
+          mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.errorMessage!)),
+        );
+      }
+    });
     final remainingCalories = _targetCalories - _totalCaloriesConsumed;
+    final selectedDate = diaryState.selectedDate;
 
     return Scaffold(
       backgroundColor: AaharTheme.scaffoldBg,
@@ -67,10 +103,8 @@ class _DailyDiaryScreenState extends State<DailyDiaryScreen> {
             IconButton(
               icon: const Icon(Icons.chevron_left_rounded),
               onPressed: () {
-                setState(() {
-                  _selectedDate =
-                      _selectedDate.subtract(const Duration(days: 1));
-                });
+                final date = selectedDate.subtract(const Duration(days: 1));
+                ref.read(diaryControllerProvider.notifier).changeDate(date);
               },
             ),
             Row(
@@ -82,7 +116,7 @@ class _DailyDiaryScreenState extends State<DailyDiaryScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  'Today, ${_selectedDate.day} Sep',
+                  DateFormat('EEE, d MMM').format(selectedDate),
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -94,9 +128,8 @@ class _DailyDiaryScreenState extends State<DailyDiaryScreen> {
             IconButton(
               icon: const Icon(Icons.chevron_right_rounded),
               onPressed: () {
-                setState(() {
-                  _selectedDate = _selectedDate.add(const Duration(days: 1));
-                });
+                final date = selectedDate.add(const Duration(days: 1));
+                ref.read(diaryControllerProvider.notifier).changeDate(date);
               },
             ),
           ],
@@ -206,7 +239,8 @@ class _DailyDiaryScreenState extends State<DailyDiaryScreen> {
                   children: [
                     CircularProgressIndicator(
                       value: progress,
-                      backgroundColor: AaharTheme.borderGrey.withValues(alpha: 0.5),
+                      backgroundColor:
+                          AaharTheme.borderGrey.withValues(alpha: 0.5),
                       valueColor: const AlwaysStoppedAnimation<Color>(
                         AaharTheme.primaryGreen,
                       ),
