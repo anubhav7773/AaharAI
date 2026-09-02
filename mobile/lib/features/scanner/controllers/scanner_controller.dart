@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/network_providers.dart';
 import '../../analysis/models/food_analysis_model.dart';
 
 final scannerControllerProvider =
@@ -17,8 +18,8 @@ class ScannerController
   Future<FoodAnalysisResponse?> processBarcode(String barcode) async {
     state = const AsyncValue.loading();
     try {
-      final rawData = await _apiClient.scanBarcode(barcode);
-      final analysis = FoodAnalysisResponse.fromJson(rawData);
+      final item = await _apiClient.scanBarcode(barcode);
+      final analysis = FoodAnalysisResponse.fromJson(item.toJson());
       state = AsyncValue.data(analysis);
       return analysis;
     } catch (err, stack) {

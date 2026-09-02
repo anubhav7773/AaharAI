@@ -1,82 +1,153 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../config/app_env.dart';
 
-final apiClientProvider = Provider<ApiClient>(
-  (ref) => ApiClient(AppEnv.fromEnvironment().validate()),
-);
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
+import '../config/app_env.dart';
+import '../models/food_models.dart';
+import 'api_exceptions.dart';
 
 class ApiClient {
-  late final Dio dio;
+  late final Dio _dio;
 
-  ApiClient([AppEnv? env]) {
-    final appEnv = (env ?? AppEnv.fromEnvironment()).validate();
-    dio = Dio(
-      BaseOptions(
-        baseUrl: appEnv.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 25), // Cold Gemini inference buffer
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'AaharAi-Mobile/1.0 (founder@asiverticals.me)',
-        },
-      ),
-    );
+  ApiClient({Dio? dioOverride, AppEnv? env}) {
+    _dio = dioOverride ??
+        Dio(
+          BaseOptions(
+            baseUrl: (env ?? AppEnv.fromEnvironment()).validate().apiBaseUrl,
+            connectTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 20),
+            sendTimeout: const Duration(seconds: 20),
+            headers: {
+              'Accept': 'application/json',
+              'X-Client-Platform':
+                  !kIsWeb && Platform.isAndroid ? 'android' : 'ios',
+            },
+          ),
+        );
+    _setupInterceptors();
+  }
 
-    dio.interceptors.add(
+  void _setupInterceptors() {
+    _dio.interceptors.add(
       InterceptorsWrapper(
-        onError: (DioException err, ErrorInterceptorHandler handler) async {
-          // Automatic 1-time retry for Render spin-up delays or 503 drops
-          if (err.type == DioExceptionType.connectionTimeout ||
-              err.response?.statusCode == 503 ||
-              err.response?.statusCode == 504) {
-            try {
-              final response = await dio.request(
-                err.requestOptions.path,
-                options: Options(
-                  method: err.requestOptions.method,
-                  headers: err.requestOptions.headers,
-                ),
-                data: err.requestOptions.data,
-                queryParameters: err.requestOptions.queryParameters,
-              );
-              return handler.resolve(response);
-            } catch (_) {}
+        onRequest: (options, handler) {
+          if (kDebugMode) {
+            debugPrint('[HTTP Request] ${options.method} -> ${options.uri}');
           }
-          return handler.next(err);
+          handler.next(options);
+        },
+        onError: (error, handler) {
+          if (kDebugMode) {
+            debugPrint('[HTTP Error] ${error.type} -> ${error.message}');
+          }
+          handler.reject(
+            DioException(
+              requestOptions: error.requestOptions,
+              response: error.response,
+              type: error.type,
+              error: _mapDioError(error),
+            ),
+          );
         },
       ),
     );
   }
 
-  Future<void> warmUpServer() async {
-    try {
-      await dio.get('/health');
-    } catch (_) {}
+  ApiException _mapDioError(DioException error) {
+    if ({
+      DioExceptionType.connectionTimeout,
+      DioExceptionType.sendTimeout,
+      DioExceptionType.receiveTimeout,
+      DioExceptionType.connectionError,
+    }.contains(error.type)) {
+      return NetworkException();
+    }
+
+    final response = error.response;
+    if (response != null) {
+      final data = response.data;
+      final message = data is Map<String, dynamic> && data['detail'] != null
+          ? data['detail'].toString()
+          : 'An unexpected server error occurred.';
+      if (response.statusCode == 404) {
+        return ProductNotFoundException(message);
+      }
+      if (response.statusCode == 502 || response.statusCode == 503) {
+        return ServerWarmingException();
+      }
+      return ApiException(
+        message: message,
+        statusCode: response.statusCode,
+        details: data,
+      );
+    }
+    return ApiException(message: error.message ?? 'Unknown error occurred.');
   }
 
-  Future<Map<String, dynamic>> scanBarcode(String barcode) async {
-    final res = await dio.get('/api/v1/scan/barcode/$barcode');
-    return res.data as Map<String, dynamic>;
+  Future<bool> warmUpServer() async {
+    try {
+      final response = await _dio.get('/health');
+      return response.statusCode == 200;
+    } on DioException {
+      return false;
+    }
+  }
+
+  Future<FoodItem> scanBarcode(String barcode) async {
+    try {
+      final response =
+          await _dio.get('/api/v1/scan/barcode/${barcode.trim()}');
+      return FoodItem.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (error) {
+      throw _apiException(error);
+    }
+  }
+
+  Future<FoodItem> getStreetFoodAnalysis(String dishName) async {
+    try {
+      final response = await _dio.get(
+        '/api/v1/scan/street-food',
+        queryParameters: {'dish_name': dishName.trim()},
+      );
+      return FoodItem.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (error) {
+      throw _apiException(error);
+    }
+  }
+
+  Future<FoodItem> scanLabelVision({
+    required List<int> imageBytes,
+    required String fileName,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/v1/scan/vision',
+        data: FormData.fromMap({
+          'file': MultipartFile.fromBytes(imageBytes, filename: fileName),
+        }),
+      );
+      return FoodItem.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (error) {
+      throw _apiException(error);
+    }
   }
 
   Future<Map<String, dynamic>> uploadLabelImage(File imageFile) async {
-    final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(
-        imageFile.path,
-        filename: 'ingredient_label.jpg',
-      ),
-    });
-    final res = await dio.post('/api/v1/scan/vision', data: formData);
-    return res.data as Map<String, dynamic>;
+    final item = await scanLabelVision(
+      imageBytes: await imageFile.readAsBytes(),
+      fileName: imageFile.uri.pathSegments.last,
+    );
+    return item.toJson();
   }
 
   Future<Map<String, dynamic>> fetchStreetFoodAnalysis(String dishName) async {
-    final res = await dio.get(
-      '/api/v1/scan/street-food',
-      queryParameters: {'dish_name': dishName},
-    );
-    return res.data as Map<String, dynamic>;
+    final item = await getStreetFoodAnalysis(dishName);
+    return item.toJson();
   }
+
+  ApiException _apiException(DioException error) =>
+      error.error is ApiException
+          ? error.error as ApiException
+          : ApiException(message: error.message ?? 'Unknown error occurred.');
 }

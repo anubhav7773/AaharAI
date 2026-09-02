@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../controllers/scanner_controller.dart';
-import '../../../core/network/api_client.dart';
+import '../../../core/network/network_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/image_compressor.dart';
 
@@ -20,8 +20,7 @@ class UniversalScannerScreen extends ConsumerStatefulWidget {
       _UniversalScannerScreenState();
 }
 
-class _UniversalScannerScreenState
-    extends ConsumerState<UniversalScannerScreen>
+class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
     with SingleTickerProviderStateMixin {
   int _selectedMode = 0; // 0 = Barcode Scan, 1 = Label OCR Photo
   final MobileScannerController _barcodeController = MobileScannerController(
@@ -84,7 +83,8 @@ class _UniversalScannerScreenState
     setState(() => _isFlashOn = !_isFlashOn);
     if (_selectedMode == 0) {
       await _barcodeController.toggleTorch();
-    } else if (_photoController != null && _photoController!.value.isInitialized) {
+    } else if (_photoController != null &&
+        _photoController!.value.isInitialized) {
       await _photoController!.setFlashMode(
         _isFlashOn ? FlashMode.torch : FlashMode.off,
       );
@@ -240,7 +240,8 @@ class _UniversalScannerScreenState
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF22C55E).withValues(alpha: 0.8),
+                                color: const Color(0xFF22C55E)
+                                    .withValues(alpha: 0.8),
                                 blurRadius: 10,
                                 spreadRadius: 2,
                               ),
