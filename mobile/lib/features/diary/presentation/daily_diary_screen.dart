@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import 'diary_controller.dart';
+import 'widgets/diary_banner_ad.dart';
 
 class DailyDiaryScreen extends ConsumerStatefulWidget {
   const DailyDiaryScreen({super.key});
@@ -161,7 +162,7 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
           const SizedBox(height: 20),
 
           // Card 3: Non-Intrusive AdMob Banner Container
-          _buildAdMobBannerSlot(),
+          const DiaryBannerAd(),
         ],
       ),
     );
@@ -463,46 +464,4 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
     );
   }
 
-  Widget _buildAdMobBannerSlot() {
-    return Container(
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AaharTheme.borderGrey),
-      ),
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              decoration: BoxDecoration(
-                color: AaharTheme.textLight.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                'SPONSORED',
-                style: GoogleFonts.inter(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: AaharTheme.textMuted,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'AdMob 320x50 Banner Space',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: AaharTheme.textLight,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

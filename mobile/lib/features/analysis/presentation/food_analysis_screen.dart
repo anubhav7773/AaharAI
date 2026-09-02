@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/food_analysis_model.dart';
 import '../../../core/theme/app_theme.dart';
@@ -9,8 +10,10 @@ import '../../../shared/widgets/macro_pill_card.dart';
 import '../../../shared/widgets/allergen_alert_card.dart';
 import '../../../shared/widgets/health_disclaimer_footer.dart';
 import 'widgets/molecule_card.dart';
+import '../../../core/ads/ad_manager.dart';
+import '../../../core/billing/subscription_provider.dart';
 
-class FoodAnalysisScreen extends StatefulWidget {
+class FoodAnalysisScreen extends ConsumerStatefulWidget {
   final FoodAnalysisResponse? analysis;
   final Map<String, dynamic>? rawPayload;
 
@@ -21,10 +24,10 @@ class FoodAnalysisScreen extends StatefulWidget {
   });
 
   @override
-  State<FoodAnalysisScreen> createState() => _FoodAnalysisScreenState();
+  ConsumerState<FoodAnalysisScreen> createState() => _FoodAnalysisScreenState();
 }
 
-class _FoodAnalysisScreenState extends State<FoodAnalysisScreen> {
+class _FoodAnalysisScreenState extends ConsumerState<FoodAnalysisScreen> {
   late FoodAnalysisResponse _data;
 
   @override
@@ -47,41 +50,53 @@ class _FoodAnalysisScreenState extends State<FoodAnalysisScreen> {
           fat100g: 30.9,
           fiber100g: 3.2,
         ),
-        allergensDetected: ['Milk Solids', 'Hazelnuts (Tree Nuts)', 'Soy Lecithin'],
+        allergensDetected: [
+          'Milk Solids',
+          'Hazelnuts (Tree Nuts)',
+          'Soy Lecithin'
+        ],
         ingredients: [
           IngredientItem(
             name: 'Sugar (Sucrose)',
-            simpleExplanation: 'Refined granulated sweetener providing fast energy.',
+            simpleExplanation:
+                'Refined granulated sweetener providing fast energy.',
             category: SafetyCategory.moderate,
-            healthNote: 'High glycemic index. Consume within recommended daily intake.',
+            healthNote:
+                'High glycemic index. Consume within recommended daily intake.',
           ),
           IngredientItem(
             name: 'Palm Oil',
-            simpleExplanation: 'Vegetable fat providing creamy spreadable texture.',
+            simpleExplanation:
+                'Vegetable fat providing creamy spreadable texture.',
             category: SafetyCategory.moderate,
-            healthNote: 'Contains saturated fatty acids. Standard culinary lipid.',
+            healthNote:
+                'Contains saturated fatty acids. Standard culinary lipid.',
           ),
           IngredientItem(
             name: 'Hazelnuts (13%)',
-            simpleExplanation: 'Natural tree nuts rich in healthy unsaturated fats and vitamin E.',
+            simpleExplanation:
+                'Natural tree nuts rich in healthy unsaturated fats and vitamin E.',
             category: SafetyCategory.safe,
             healthNote: 'Wholesome natural nut ingredient. Known allergen.',
           ),
           IngredientItem(
             name: 'Skimmed Milk Powder (8.7%)',
-            simpleExplanation: 'Dehydrated milk solids providing dairy protein and calcium.',
+            simpleExplanation:
+                'Dehydrated milk solids providing dairy protein and calcium.',
             category: SafetyCategory.safe,
             healthNote: 'FSSAI compliant dairy constituent. Contains lactose.',
           ),
           IngredientItem(
             name: 'INS 322 - Soya Lecithin',
-            simpleExplanation: 'Natural emulsifier extracted from soybeans that prevents cocoa and oil from separating.',
+            simpleExplanation:
+                'Natural emulsifier extracted from soybeans that prevents cocoa and oil from separating.',
             category: SafetyCategory.safe,
             healthNote: 'FSSAI Permitted Emulsifier. No ADI limit.',
           ),
           IngredientItem(
             name: 'Vanillin',
-            simpleExplanation: 'Aroma compound creating the classic vanilla flavor note.',
+            simpleExplanation:
+                'Aroma compound creating the classic vanilla flavor note.',
             category: SafetyCategory.safe,
             healthNote: 'Identical to natural flavor compound.',
           ),
@@ -98,7 +113,12 @@ class _FoodAnalysisScreenState extends State<FoodAnalysisScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            ref.read(adManagerProvider).showInterstitialIfEligible(
+                  isProUser: ref.read(isProUserProvider).valueOrNull == true,
+                );
+            context.pop();
+          },
         ),
         title: Text(
           'Food Breakdown',
