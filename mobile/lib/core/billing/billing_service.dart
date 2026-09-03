@@ -1,13 +1,21 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:path_provider/path_provider.dart';
 
 class BillingService {
-  BillingService({InAppPurchase? store}) : _iap = store ?? InAppPurchase.instance;
+  BillingService({InAppPurchase? store, File? cacheFileOverride})
+      : _customStore = store,
+        _customCacheFile = cacheFileOverride;
 
-  final InAppPurchase _iap;
+  final InAppPurchase? _customStore;
+  final File? _customCacheFile;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
+
+  InAppPurchase get _iap => _customStore ?? InAppPurchase.instance;
 
   static const weeklyPlanId = 'aaharai_pro_weekly';
   static const monthlyPlanId = 'aaharai_pro_monthly';
@@ -28,7 +36,53 @@ class BillingService {
   Stream<bool> get proUserChanges => _proUserChanges.stream;
   Stream<List<ProductDetails>> get productChanges => _productChanges.stream;
 
+  Future<File?> _resolveCacheFile() async {
+    if (_customCacheFile != null) return _customCacheFile;
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      return File('${dir.path}/aaharai_pro_entitlement.json');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> persistEntitlement(bool isPro) async {
+    try {
+      final file = await _resolveCacheFile();
+      if (file != null) {
+        await file.writeAsString(
+          jsonEncode({
+            'is_pro': isPro,
+            'updated_at': DateTime.now().toIso8601String(),
+          }),
+        );
+      }
+    } catch (e) {
+      debugPrint('[BillingService] Failed to persist entitlement: $e');
+    }
+  }
+
+  Future<bool> loadCachedEntitlement() async {
+    try {
+      final file = await _resolveCacheFile();
+      if (file != null && await file.exists()) {
+        final content = await file.readAsString();
+        final data = jsonDecode(content);
+        if (data is Map && data['is_pro'] == true) {
+          isProUser.value = true;
+          _proUserChanges.add(true);
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('[BillingService] Failed to load cached entitlement: $e');
+    }
+    return false;
+  }
+
   Future<void> initialize() async {
+    await loadCachedEntitlement();
+
     if (!await _iap.isAvailable()) {
       debugPrint('[BillingService] Google Play Store unavailable.');
       return;
@@ -39,7 +93,6 @@ class BillingService {
       onError: (Object error) => debugPrint('[BillingService] $error'),
     );
     await loadProducts();
-    await restorePurchases();
   }
 
   Future<void> loadProducts() async {
@@ -69,6 +122,7 @@ class BillingService {
         if (_verifyPurchase(purchase)) {
           isProUser.value = true;
           _proUserChanges.add(true);
+          await persistEntitlement(true);
         }
         if (purchase.pendingCompletePurchase) {
           await _iap.completePurchase(purchase);

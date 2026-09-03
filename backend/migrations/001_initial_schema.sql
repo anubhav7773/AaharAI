@@ -32,7 +32,7 @@ $$;
 
 create table if not exists public.profiles (
     id uuid primary key references auth.users(id) on delete cascade,
-    email text unique not null,
+    email text unique,
     display_name text,
     avatar_url text,
     daily_calorie_goal integer not null default 2000
@@ -126,12 +126,12 @@ begin
     insert into public.profiles (id, email, display_name, avatar_url)
     values (
         new.id,
-        coalesce(new.email, ''),
-        new.raw_user_meta_data ->> 'full_name',
+        nullif(trim(coalesce(new.email, '')), ''),
+        coalesce(new.raw_user_meta_data ->> 'full_name', 'Guest User'),
         new.raw_user_meta_data ->> 'avatar_url'
     )
     on conflict (id) do update
-    set email = excluded.email,
+    set email = coalesce(excluded.email, public.profiles.email),
         display_name = coalesce(excluded.display_name, public.profiles.display_name),
         avatar_url = coalesce(excluded.avatar_url, public.profiles.avatar_url);
     return new;

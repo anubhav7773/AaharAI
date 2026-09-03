@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class IngredientSafetyEnum(str, Enum):
@@ -19,33 +19,69 @@ class FoodSourceEnum(str, Enum):
 
 
 class ParsedIngredientSchema(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str = Field(description="Normalized common ingredient or chemical name")
     ins_code: Optional[str] = Field(
         default=None, description="FSSAI INS / E-number code if identified"
     )
     safety: IngredientSafetyEnum = Field(
-        description="Strictly safe, moderate, or avoid"
+        validation_alias=AliasChoices("safety", "category"),
+        description="Strictly safe, moderate, or avoid",
     )
     plain_explanation: str = Field(
-        description="One-line explanation in everyday simple language"
+        validation_alias=AliasChoices("plain_explanation", "simple_explanation"),
+        description="One-line explanation in everyday simple language",
     )
     regulatory_footnote: Optional[str] = Field(
-        default=None, description="Brief FSSAI or ICMR threshold note"
+        default=None,
+        validation_alias=AliasChoices("regulatory_footnote", "health_note"),
+        description="Brief FSSAI or ICMR threshold note",
     )
 
 
 class NutrientProfileSchema(BaseModel):
-    calories: float = Field(description="Energy in kcal per 100g or serving")
-    protein_g: float = 0.0
-    carbs_g: float = 0.0
-    fat_g: float = 0.0
-    saturated_fat_g: Optional[float] = None
-    added_sugar_g: Optional[float] = None
-    sodium_mg: Optional[float] = None
-    fiber_g: Optional[float] = None
+    model_config = ConfigDict(populate_by_name=True)
+
+    calories: float = Field(
+        validation_alias=AliasChoices("calories", "calories_100g"),
+        description="Energy in kcal per 100g or serving",
+    )
+    protein_g: float = Field(
+        default=0.0,
+        validation_alias=AliasChoices("protein_g", "protein_100g", "protein"),
+    )
+    carbs_g: float = Field(
+        default=0.0,
+        validation_alias=AliasChoices("carbs_g", "carbs_100g", "carbs"),
+    )
+    fat_g: float = Field(
+        default=0.0,
+        validation_alias=AliasChoices("fat_g", "fat_100g", "fat"),
+    )
+    saturated_fat_g: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "saturated_fat_g", "saturated_fat_100g", "saturated-fat_100g"
+        ),
+    )
+    added_sugar_g: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("added_sugar_g", "sugars_100g", "sugars"),
+    )
+    sodium_mg: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("sodium_mg", "sodium_100g", "sodium"),
+    )
+    fiber_g: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("fiber_g", "fiber_100g", "fiber"),
+    )
 
 
 class GeminiFoodExtractionSchema(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     food_name: str
     brand_name: Optional[str] = None
     serving_size: Optional[str] = None

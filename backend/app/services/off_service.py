@@ -1,10 +1,11 @@
-"""Open Food Facts API client and response normalizer."""
-
+import logging
 from typing import Any, Dict, Optional
 
 import httpx
 
 from app.core.config import settings
+
+logger = logging.getLogger("aaharai.off")
 
 
 class OpenFoodFactsService:
@@ -21,6 +22,20 @@ class OpenFoodFactsService:
             "code,product_name,brands,ingredients_text,nutriments,"
             "allergens_tags,serving_size"
         )
+        self._client: Optional[httpx.AsyncClient] = None
+
+    async def get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                timeout=self.timeout,
+                headers=self.headers,
+                limits=httpx.Limits(max_keepalive_connections=20, max_connections=50),
+            )
+        return self._client
+
+    async def close(self) -> None:
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
 
     async def fetch_product_by_barcode(
         self, barcode: str
@@ -32,23 +47,50 @@ class OpenFoodFactsService:
 
         url = f"{self.base_url}/{clean_barcode}.json"
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    url,
-                    headers=self.headers,
-                    params={"fields": self.requested_fields},
+            client = await self.get_client()
+            response = await client.get(
+                url,
+                params={"fields": self.requested_fields},
+            )
+            if response.status_code == 404:
+                logger.info("Barcode %s not found in Open Food Facts", clean_barcode)
+                return None
+            if response.status_code == 429:
+                logger.warning(
+                    "Open Food Facts rate limit hit (429) for barcode %s", clean_barcode
                 )
-                if response.status_code != 200:
-                    return None
+                return None
+            if response.status_code != 200:
+                logger.warning(
+                    "Open Food Facts returned HTTP %d for barcode %s",
+                    response.status_code,
+                    clean_barcode,
+                )
+                return None
 
-                data = response.json()
-                if data.get("status") in (0, "0") or "product" not in data:
-                    return None
-                product = data["product"]
-                if not isinstance(product, dict):
-                    return None
-                return self._normalize_off_data(clean_barcode, product)
-        except (httpx.TimeoutException, httpx.RequestError, ValueError):
+            data = response.json()
+            if data.get("status") in (0, "0") or "product" not in data:
+                return None
+            product = data["product"]
+            if not isinstance(product, dict):
+                return None
+            return self._normalize_off_data(clean_barcode, product)
+        except httpx.TimeoutException:
+            logger.warning(
+                "Open Food Facts request timed out for barcode %s", clean_barcode
+            )
+            return None
+        except httpx.RequestError as exc:
+            logger.warning(
+                "Open Food Facts network error for barcode %s: %s", clean_barcode, exc
+            )
+            return None
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error fetching barcode %s from Open Food Facts: %s",
+                clean_barcode,
+                exc,
+            )
             return None
 
     def _normalize_off_data(

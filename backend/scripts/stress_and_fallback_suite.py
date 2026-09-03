@@ -5,10 +5,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+from pathlib import Path
+import sys
 import time
 from typing import Any
 
 import httpx
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.health_claim_filter import health_claim_sanitizer
 
@@ -18,12 +24,8 @@ UNKNOWN_BARCODE = "0000000000000"
 
 # A valid 1x1 white JPEG keeps this script independent of Pillow.
 BLANK_JPEG = base64.b64decode(
-    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////"
-    "2wBDAf//////////////////////////////////////////////////////////////////////////////////////"
-    "wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA"
-    "/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAA"
-    "AAAAAAAAAAB/2gAIAQMBAT8BH//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8BH//EABQQAQAAAA"
-    "AAAAAAAAAAAAAAABD/2gAIAQEABj8Cf//Z"
+    "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////"
+    "wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
 )
 
 

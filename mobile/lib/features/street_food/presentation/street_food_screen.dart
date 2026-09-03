@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../analysis/models/food_analysis_model.dart';
+import 'street_food_controller.dart';
 
 class StreetFoodIndexScreen extends ConsumerStatefulWidget {
   const StreetFoodIndexScreen({super.key});
@@ -17,6 +18,7 @@ class StreetFoodIndexScreen extends ConsumerStatefulWidget {
 class _StreetFoodIndexScreenState extends ConsumerState<StreetFoodIndexScreen> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedCategoryIndex = 0;
+  bool _isAnalyzing = false;
 
   final List<String> _categories = [
     'All',
@@ -112,6 +114,40 @@ class _StreetFoodIndexScreenState extends ConsumerState<StreetFoodIndexScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _queryBackendDish(String dishName) async {
+    final cleanName = dishName.trim();
+    if (cleanName.isEmpty || _isAnalyzing) return;
+
+    setState(() => _isAnalyzing = true);
+    try {
+      final item = await ref
+          .read(streetFoodControllerProvider.notifier)
+          .fetchDishAnalysis(cleanName);
+      if (item != null && mounted) {
+        final analysis = FoodAnalysisResponse.fromJson(item.toJson());
+        context.push('/analysis', extra: analysis);
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AaharTheme.textHeadline,
+            content: Text(
+              'Could not analyze "$cleanName" right now. Please verify internet connection.',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to analyze dish: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isAnalyzing = false);
+    }
   }
 
   void _analyzeStreetFood(Map<String, dynamic> item) {
@@ -212,6 +248,8 @@ class _StreetFoodIndexScreenState extends ConsumerState<StreetFoodIndexScreen> {
                   child: TextField(
                     controller: _searchController,
                     onChanged: (_) => setState(() {}),
+                    onSubmitted: (val) => _queryBackendDish(val),
+                    textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
                       hintText: 'Search Momos, Chowmein, Samosa, Golgappe...',
                       hintStyle: GoogleFonts.inter(
@@ -239,6 +277,14 @@ class _StreetFoodIndexScreenState extends ConsumerState<StreetFoodIndexScreen> {
                     ),
                   ),
                 ),
+                if (_isAnalyzing)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: LinearProgressIndicator(
+                      color: AaharTheme.primaryGreen,
+                      backgroundColor: Color(0xFFE5E7EB),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -290,24 +336,72 @@ class _StreetFoodIndexScreenState extends ConsumerState<StreetFoodIndexScreen> {
           Expanded(
             child: filteredFoods.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.fastfood_outlined,
-                          size: 48,
-                          color: AaharTheme.textLight,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No street dishes matched your search',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AaharTheme.textMuted,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.fastfood_outlined,
+                            size: 48,
+                            color: AaharTheme.textLight,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 12),
+                          Text(
+                            _searchController.text.trim().isNotEmpty
+                                ? 'No curated dish found for "${_searchController.text.trim()}"'
+                                : 'No street dishes matched your filter',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AaharTheme.textMuted,
+                            ),
+                          ),
+                          if (_searchController.text.trim().isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AaharTheme.primaryGreen,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                              ),
+                              onPressed: _isAnalyzing
+                                  ? null
+                                  : () => _queryBackendDish(
+                                        _searchController.text,
+                                      ),
+                              icon: _isAnalyzing
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.auto_awesome,
+                                      size: 18,
+                                    ),
+                              label: Text(
+                                _isAnalyzing
+                                    ? 'Analyzing with AI...'
+                                    : 'Analyze "${_searchController.text.trim()}" with AI',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   )
                 : GridView.builder(

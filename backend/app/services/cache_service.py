@@ -1,5 +1,4 @@
-"""Supabase-backed food cache with barcode and OCR de-duplication."""
-
+import asyncio
 import hashlib
 import json
 import logging
@@ -60,18 +59,40 @@ class FoodCacheService:
                 return None
 
             record = self._normalize_record(response.data[0])
-            current_hits = int(record.get("hit_count") or 1)
-            await (
-                client.table("food_cache")
-                .update({"hit_count": current_hits + 1})
-                .eq("id", record["id"])
-                .execute()
-            )
-            record["hit_count"] = current_hits + 1
-            return record
         except Exception:
             logger.exception("Cache lookup failed for %s=%s", column, value)
             return None
+
+        # Asynchronously increment hit_count without blocking or failing cache read
+        try:
+            current_hits = int(record.get("hit_count") or 1)
+            record["hit_count"] = current_hits + 1
+            asyncio.create_task(
+                self._safe_increment_hit_count(client, record["id"], current_hits + 1)
+            )
+        except Exception:
+            logger.warning(
+                "Could not schedule hit_count increment for record %s",
+                record.get("id"),
+            )
+
+        return record
+
+    @staticmethod
+    async def _safe_increment_hit_count(
+        client: AsyncClient, record_id: str, new_count: int
+    ) -> None:
+        try:
+            await (
+                client.table("food_cache")
+                .update({"hit_count": new_count})
+                .eq("id", record_id)
+                .execute()
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to increment hit_count for record %s: %s", record_id, exc
+            )
 
     async def search_by_food_name(
         self, food_name: str, limit: int = 5
@@ -155,10 +176,17 @@ class FoodCacheService:
     @staticmethod
     def _normalize_record(row: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(row)
-        for key in ("parsed_ingredients", "nutrients"):
+        for key in ("parsed_ingredients", "nutrients", "allergens"):
             value = normalized.get(key)
             if isinstance(value, str):
-                normalized[key] = json.loads(value)
+                try:
+                    normalized[key] = json.loads(value)
+                except (ValueError, TypeError):
+                    logger.warning(
+                        "Failed to decode %s as JSON in cache record: %s",
+                        key,
+                        normalized.get("id"),
+                    )
         return normalized
 
 

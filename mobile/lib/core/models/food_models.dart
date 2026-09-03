@@ -19,9 +19,14 @@ class ParsedIngredient {
     return ParsedIngredient(
       name: json['name'] as String? ?? 'Unknown Ingredient',
       insCode: json['ins_code'] as String?,
-      safety: IngredientSafety.fromString(json['safety'] as String?),
-      plainExplanation: json['plain_explanation'] as String? ?? '',
-      regulatoryFootnote: json['regulatory_footnote'] as String?,
+      safety: IngredientSafety.fromString(
+        json['safety'] as String? ?? json['category'] as String?,
+      ),
+      plainExplanation: json['plain_explanation'] as String? ??
+          json['simple_explanation'] as String? ??
+          '',
+      regulatoryFootnote: json['regulatory_footnote'] as String? ??
+          json['health_note'] as String?,
     );
   }
 
@@ -29,8 +34,11 @@ class ParsedIngredient {
         'name': name,
         'ins_code': insCode,
         'safety': safety.toValue(),
+        'category': safety.toValue(),
         'plain_explanation': plainExplanation,
+        'simple_explanation': plainExplanation,
         'regulatory_footnote': regulatoryFootnote,
+        'health_note': regulatoryFootnote,
       };
 }
 
@@ -56,29 +64,47 @@ class NutrientProfile {
   });
 
   factory NutrientProfile.fromJson(Map<String, dynamic> json) {
-    double? number(String key) => (json[key] as num?)?.toDouble();
+    double? number(String primary, [List<String> aliases = const []]) {
+      if (json[primary] != null) return (json[primary] as num?)?.toDouble();
+      for (final alias in aliases) {
+        if (json[alias] != null) return (json[alias] as num?)?.toDouble();
+      }
+      return null;
+    }
 
     return NutrientProfile(
-      calories: number('calories') ?? 0,
-      proteinG: number('protein_g') ?? 0,
-      carbsG: number('carbs_g') ?? 0,
-      fatG: number('fat_g') ?? 0,
-      saturatedFatG: number('saturated_fat_g'),
-      addedSugarG: number('added_sugar_g'),
-      sodiumMg: number('sodium_mg'),
-      fiberG: number('fiber_g'),
+      calories: number('calories', ['calories_100g']) ?? 0,
+      proteinG: number('protein_g', ['protein_100g', 'protein']) ?? 0,
+      carbsG: number('carbs_g', ['carbs_100g', 'carbs']) ?? 0,
+      fatG: number('fat_g', ['fat_100g', 'fat']) ?? 0,
+      saturatedFatG: number(
+        'saturated_fat_g',
+        ['saturated_fat_100g', 'saturated-fat_100g'],
+      ),
+      addedSugarG: number('added_sugar_g', ['sugars_100g', 'sugars']),
+      sodiumMg: number('sodium_mg', ['sodium_100g', 'sodium']),
+      fiberG: number('fiber_g', ['fiber_100g', 'fiber']),
     );
   }
 
   Map<String, dynamic> toJson() => {
         'calories': calories,
+        'calories_100g': calories,
         'protein_g': proteinG,
+        'protein_100g': proteinG,
+        'protein': proteinG,
         'carbs_g': carbsG,
+        'carbs_100g': carbsG,
+        'carbs': carbsG,
         'fat_g': fatG,
+        'fat_100g': fatG,
+        'fat': fatG,
         'saturated_fat_g': saturatedFatG,
         'added_sugar_g': addedSugarG,
         'sodium_mg': sodiumMg,
         'fiber_g': fiberG,
+        'fiber_100g': fiberG,
+        'fiber': fiberG,
       };
 }
 
@@ -109,8 +135,8 @@ class FoodItem {
 
   factory FoodItem.fromJson(Map<String, dynamic> json) {
     final nutrientJson = json['nutrients'];
-    final ingredientJson = json['parsed_ingredients'];
-    final allergenJson = json['allergens'];
+    final ingredientJson = json['parsed_ingredients'] ?? json['ingredients'];
+    final allergenJson = json['allergens'] ?? json['allergens_detected'];
 
     return FoodItem(
       id: json['id'] as String?,
@@ -119,8 +145,8 @@ class FoodItem {
       brandName: json['brand_name'] as String?,
       source: FoodSourceType.fromString(json['source'] as String?),
       servingSize: json['serving_size'] as String?,
-      nutrients: nutrientJson is Map<String, dynamic>
-          ? NutrientProfile.fromJson(nutrientJson)
+      nutrients: nutrientJson is Map
+          ? NutrientProfile.fromJson(Map<String, dynamic>.from(nutrientJson))
           : const NutrientProfile(
               calories: 0,
               proteinG: 0,
@@ -129,8 +155,12 @@ class FoodItem {
             ),
       parsedIngredients: ingredientJson is List
           ? ingredientJson
-              .whereType<Map<String, dynamic>>()
-              .map(ParsedIngredient.fromJson)
+              .whereType<Map>()
+              .map(
+                (item) => ParsedIngredient.fromJson(
+                  Map<String, dynamic>.from(item),
+                ),
+              )
               .toList()
           : const [],
       allergens: allergenJson is List
@@ -150,7 +180,10 @@ class FoodItem {
         'nutrients': nutrients.toJson(),
         'parsed_ingredients':
             parsedIngredients.map((ingredient) => ingredient.toJson()).toList(),
+        'ingredients':
+            parsedIngredients.map((ingredient) => ingredient.toJson()).toList(),
         'allergens': allergens,
+        'allergens_detected': allergens,
         'preparation_insights': preparationInsights,
       };
 }

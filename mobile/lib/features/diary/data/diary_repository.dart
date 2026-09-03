@@ -12,23 +12,33 @@ class DiaryRepository {
 
   String? get _currentUserId => _client.auth.currentUser?.id;
 
+  /// Convert local calendar day to UTC range [start, end)
+  static (DateTime, DateTime) computeUtcDateRange(DateTime date) {
+    final localStart = DateTime(date.year, date.month, date.day);
+    final localEnd = localStart.add(const Duration(days: 1));
+    return (localStart.toUtc(), localEnd.toUtc());
+  }
+
   Future<List<FoodLogEntry>> fetchLogsForDate(DateTime date) async {
     final userId = _currentUserId;
     if (userId == null) return [];
 
-    final start = DateTime.utc(date.year, date.month, date.day);
-    final end = start.add(const Duration(days: 1));
-    final response = await _client
-        .from('food_logs')
-        .select()
-        .eq('user_id', userId)
-        .gte('logged_at', start.toIso8601String())
-        .lt('logged_at', end.toIso8601String())
-        .order('logged_at');
+    final (startUtc, endUtc) = computeUtcDateRange(date);
+    try {
+      final response = await _client
+          .from('food_logs')
+          .select()
+          .eq('user_id', userId)
+          .gte('logged_at', startUtc.toIso8601String())
+          .lt('logged_at', endUtc.toIso8601String())
+          .order('logged_at');
 
-    return (response as List)
-        .map((item) => FoodLogEntry.fromJson(item as Map<String, dynamic>))
-        .toList();
+      return (response as List)
+          .map((item) => FoodLogEntry.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<FoodLogEntry> logFood({

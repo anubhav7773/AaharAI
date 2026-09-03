@@ -17,11 +17,29 @@ logger = logging.getLogger("aaharai.gemini")
 
 class GeminiInferenceService:
     def __init__(self) -> None:
-        self.client = genai.Client(
-            api_key=settings.GEMINI_API_KEY.get_secret_value()
-        )
+        self._client: Optional[genai.Client] = None
         self.model_name = settings.GEMINI_MODEL_NAME
         self.system_instruction = settings.SYSTEM_INSTRUCTION
+        self.request_timeout_seconds = 20.0
+
+    @property
+    def client(self) -> genai.Client:
+        if self._client is None:
+            self._client = genai.Client(
+                api_key=settings.GEMINI_API_KEY.get_secret_value()
+            )
+        return self._client
+
+    @staticmethod
+    def _clean_json_text(text: str) -> str:
+        cleaned = text.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        return cleaned.strip()
 
     async def _execute_with_retry(
         self,
@@ -34,28 +52,48 @@ class GeminiInferenceService:
 
         for attempt in range(1, max_retries + 1):
             try:
-                response = await asyncio.to_thread(
-                    self.client.models.generate_content,
-                    model=self.model_name,
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        system_instruction=self.system_instruction,
-                        temperature=0.1,
-                        response_mime_type="application/json",
-                        response_schema=schema,
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.client.models.generate_content,
+                        model=self.model_name,
+                        contents=contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=self.system_instruction,
+                            temperature=0.1,
+                            response_mime_type="application/json",
+                            response_schema=schema,
+                        ),
                     ),
+                    timeout=self.request_timeout_seconds,
                 )
                 response_text = getattr(response, "text", None)
                 if not response_text:
                     raise ValueError("Empty response text received from Gemini API")
-                return schema.model_validate(json.loads(response_text))
+
+                sanitized_json = self._clean_json_text(response_text)
+                return schema.model_validate(json.loads(sanitized_json))
+            except asyncio.TimeoutError as exc:
+                last_exception = exc
+                logger.warning(
+                    "Gemini API timed out after %.1fs (attempt %d/%d)",
+                    self.request_timeout_seconds,
+                    attempt,
+                    max_retries,
+                )
             except APIError as exc:
                 last_exception = exc
                 code = getattr(exc, "code", None)
-                if code != 429 and "RESOURCE_EXHAUSTED" not in str(exc):
+                is_transient = (
+                    code in (429, 500, 502, 503, 504)
+                    or "RESOURCE_EXHAUSTED" in str(exc)
+                    or "UNAVAILABLE" in str(exc)
+                    or "DEADLINE_EXCEEDED" in str(exc)
+                )
+                if not is_transient:
                     raise
                 logger.warning(
-                    "Gemini quota hit; backing off %.1fs (attempt %d/%d)",
+                    "Gemini transient API error (%s); backing off %.1fs (attempt %d/%d)",
+                    code or str(exc),
                     delay,
                     attempt,
                     max_retries,

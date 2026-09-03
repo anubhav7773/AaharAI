@@ -68,13 +68,17 @@ health_claim_sanitizer = HealthClaimSanitizer()
 
 
 class HealthClaimMiddleware(BaseHTTPMiddleware):
-    """Sanitize JSON scan responses at the final API boundary."""
+    """Sanitize successful JSON scan responses at the final API boundary."""
 
     async def dispatch(self, request: Request, call_next) -> Response:
         response = await call_next(request)
-        if "/scan/" not in request.url.path or not response.headers.get(
-            "content-type", ""
-        ).startswith("application/json"):
+        if (
+            response.status_code != 200
+            or "/scan/" not in request.url.path
+            or not response.headers.get("content-type", "").startswith(
+                "application/json"
+            )
+        ):
             return response
 
         body = b"".join([chunk async for chunk in response.body_iterator])
@@ -101,8 +105,8 @@ class HealthClaimMiddleware(BaseHTTPMiddleware):
             if key.lower() not in {"content-length", "content-encoding"}
         }
         return Response(
-            content=json.dumps(cleaned),
+            content=json.dumps(cleaned, ensure_ascii=False),
             status_code=response.status_code,
             headers=headers,
-            media_type="application/json",
+            media_type="application/json; charset=utf-8",
         )

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from backend.app.core.config import Settings
+from app.core.config import Settings
 
 
 def write_env(path: Path, **values: str) -> None:
@@ -70,7 +70,10 @@ def test_settings_reports_each_missing_variable_without_values(
 
 
 def test_default_env_file_is_repository_relative(tmp_path: Path, monkeypatch) -> None:
-    env_file = Path("backend/.env").resolve()
+    env_file = (Path(__file__).resolve().parents[1] / ".env")
+    original_content = (
+        env_file.read_text(encoding="utf-8") if env_file.exists() else None
+    )
     env_file.write_text(
         "GEMINI_API_KEY=temporary-gemini\n"
         "SUPABASE_URL=https://temporary.supabase.co\n"
@@ -82,4 +85,7 @@ def test_default_env_file_is_repository_relative(tmp_path: Path, monkeypatch) ->
         settings = Settings()
         assert settings.SUPABASE_URL == "https://temporary.supabase.co"
     finally:
-        env_file.unlink()
+        if original_content is not None:
+            env_file.write_text(original_content, encoding="utf-8")
+        elif env_file.exists():
+            env_file.unlink()
