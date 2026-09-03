@@ -64,9 +64,9 @@ async def test_api_suite() -> None:
             assert health.status_code == 200
             assert health.json()["status"] == "healthy"
 
-            uptime = await client.get("/uptime")
-            assert uptime.status_code == 200
-            assert uptime.json()["status"] == "healthy"
+            health_head = await client.head("/health")
+            assert health_head.status_code == 200
+            assert not health_head.content
 
             barcode = await client.get("/api/v1/scan/barcode/3017624010701")
             assert barcode.status_code == 200
