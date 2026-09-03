@@ -116,7 +116,10 @@ class _StreetFoodIndexScreenState extends ConsumerState<StreetFoodIndexScreen> {
     super.dispose();
   }
 
-  Future<void> _queryBackendDish(String dishName) async {
+  Future<void> _queryBackendDish(
+    String dishName, {
+    Map<String, dynamic>? fallbackItem,
+  }) async {
     final cleanName = dishName.trim();
     if (cleanName.isEmpty || _isAnalyzing) return;
 
@@ -128,25 +131,26 @@ class _StreetFoodIndexScreenState extends ConsumerState<StreetFoodIndexScreen> {
       if (item != null && mounted) {
         final analysis = FoodAnalysisResponse.fromJson(item.toJson());
         context.push('/analysis', extra: analysis);
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AaharTheme.textHeadline,
-            content: Text(
-              'Could not analyze "$cleanName" right now. Please verify internet connection.',
-              style: const TextStyle(color: Colors.white),
-            ),
-          ),
-        );
+        return;
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to analyze dish: $e')),
-        );
-      }
+      debugPrint('Backend analysis error for "$cleanName": $e');
     } finally {
       if (mounted) setState(() => _isAnalyzing = false);
+    }
+
+    if (fallbackItem != null && mounted) {
+      _analyzeStreetFood(fallbackItem);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AaharTheme.textHeadline,
+          content: Text(
+            'Could not analyze "$cleanName". Please check backend connection.',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
     }
   }
 
@@ -435,7 +439,10 @@ class _StreetFoodIndexScreenState extends ConsumerState<StreetFoodIndexScreen> {
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
-                            onTap: () => _analyzeStreetFood(item),
+                            onTap: () => _queryBackendDish(
+                              item['name'] as String,
+                              fallbackItem: item,
+                            ),
                             child: Padding(
                               padding: const EdgeInsets.all(12.0),
                               child: Column(

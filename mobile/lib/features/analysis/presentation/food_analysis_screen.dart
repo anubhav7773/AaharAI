@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/food_analysis_model.dart';
+import '../../diary/presentation/diary_controller.dart';
+import '../../../core/models/enums.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/macro_pill_card.dart';
 import '../../../shared/widgets/allergen_alert_card.dart';
@@ -205,16 +207,45 @@ class _FoodAnalysisScreenState extends ConsumerState<FoodAnalysisScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         ElevatedButton.icon(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: AaharTheme.primaryGreen,
-                                content: Text(
-                                  'Logged "${_data.foodName}" to Daily Diary!',
+                          onPressed: () async {
+                            final now = DateTime.now();
+                            MealCategoryType mealType;
+                            if (now.hour >= 5 && now.hour < 11) {
+                              mealType = MealCategoryType.breakfast;
+                            } else if (now.hour >= 11 && now.hour < 16) {
+                              mealType = MealCategoryType.lunch;
+                            } else if (now.hour >= 16 && now.hour < 19) {
+                              mealType = MealCategoryType.snack;
+                            } else {
+                              mealType = MealCategoryType.dinner;
+                            }
+
+                            await ref
+                                .read(diaryControllerProvider.notifier)
+                                .addEntry(
+                                  foodName: _data.foodName,
+                                  cacheId: null,
+                                  servingQuantityG: 100.0,
+                                  caloriesConsumed: _data.nutrients.calories100g,
+                                  consumedMacros: {
+                                    'protein_g': _data.nutrients.protein100g,
+                                    'carbs_g': _data.nutrients.carbs100g,
+                                    'fat_g': _data.nutrients.fat100g,
+                                  },
+                                  mealType: mealType,
+                                );
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  backgroundColor: AaharTheme.primaryGreen,
+                                  content: Text(
+                                    'Logged "${_data.foodName}" to Daily Diary!',
+                                  ),
                                 ),
-                              ),
-                            );
-                            context.go('/diary');
+                              );
+                              context.go('/diary');
+                            }
                           },
                           icon: const Icon(Icons.add_task_rounded),
                           label: const Text('Log to Daily Food Diary'),

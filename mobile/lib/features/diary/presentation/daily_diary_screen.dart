@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/models/enums.dart';
+import '../../../core/models/food_log_model.dart';
 import '../../../core/theme/app_theme.dart';
 import 'diary_controller.dart';
 import 'widgets/diary_banner_ad.dart';
@@ -14,71 +18,12 @@ class DailyDiaryScreen extends ConsumerStatefulWidget {
 }
 
 class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
-  final List<Map<String, dynamic>> _meals = [
-    {
-      'mealType': 'Breakfast',
-      'items': [
-        {
-          'name': '2 Whole Wheat Roti + Dal',
-          'calories': 310,
-          'time': '8:30 AM'
-        },
-        {
-          'name': 'Masala Chai (with 1 tsp sugar)',
-          'calories': 75,
-          'time': '8:45 AM'
-        },
-      ],
-    },
-    {
-      'mealType': 'Lunch',
-      'items': [
-        {
-          'name': 'Steamed Rice + Paneer Curry + Salad',
-          'calories': 560,
-          'time': '1:15 PM'
-        },
-      ],
-    },
-    {
-      'mealType': 'Snacks',
-      'items': [
-        {
-          'name': 'Marie Gold Biscuits (Scanned)',
-          'calories': 135,
-          'time': '4:45 PM'
-        },
-        {
-          'name': 'Roasted Makhana (Foxnuts)',
-          'calories': 95,
-          'time': '5:00 PM'
-        },
-      ],
-    },
-    {
-      'mealType': 'Dinner',
-      'items': [
-        {
-          'name': 'Veg Steamed Momos (6 pcs)',
-          'calories': 245,
-          'time': '8:15 PM'
-        },
-      ],
-    },
+  static const _mealCategories = [
+    (MealCategoryType.breakfast, 'Breakfast'),
+    (MealCategoryType.lunch, 'Lunch'),
+    (MealCategoryType.snack, 'Snacks'),
+    (MealCategoryType.dinner, 'Dinner'),
   ];
-
-  int get _totalCaloriesConsumed {
-    int total = 0;
-    for (final meal in _meals) {
-      final items = meal['items'] as List<Map<String, dynamic>>;
-      for (final item in items) {
-        total += (item['calories'] as num).toInt();
-      }
-    }
-    return total;
-  }
-
-  static const int _targetCalories = 2000;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +37,7 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
         );
       }
     });
-    final remainingCalories = _targetCalories - _totalCaloriesConsumed;
+
     final selectedDate = diaryState.selectedDate;
 
     return Scaffold(
@@ -136,40 +81,63 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
           ],
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: [
-          // Card 1: Calorie Budget Progress Card
-          _buildCalorieBudgetCard(remainingCalories),
+      body: diaryState.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              children: [
+                // Card 1: Dynamic Calorie Budget & Macros
+                _buildCalorieBudgetCard(diaryState),
 
-          const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-          // Section Title
-          Text(
-            'Meal Logs Timeline',
-            style: GoogleFonts.inter(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AaharTheme.textHeadline,
+                // Section Title
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Meal Logs Timeline',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AaharTheme.textHeadline,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => context.go('/scanner'),
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                      label: const Text('Scan Food'),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // Dynamic Meal Logs List
+                ..._mealCategories.map(
+                  (cat) => _buildMealSection(
+                    categoryType: cat.$1,
+                    categoryTitle: cat.$2,
+                    logs: diaryState.logs
+                        .where((log) => log.mealType == cat.$1)
+                        .toList(),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Non-Intrusive AdMob Banner Container
+                const DiaryBannerAd(),
+              ],
             ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Meal Logs List
-          ..._meals.map((meal) => _buildMealSection(meal)),
-
-          const SizedBox(height: 20),
-
-          // Card 3: Non-Intrusive AdMob Banner Container
-          const DiaryBannerAd(),
-        ],
-      ),
     );
   }
 
-  Widget _buildCalorieBudgetCard(int remainingCalories) {
-    final progress = (_totalCaloriesConsumed / _targetCalories).clamp(0.0, 1.0);
+  Widget _buildCalorieBudgetCard(DiaryState diaryState) {
+    final consumed = diaryState.totalCaloriesConsumed.toInt();
+    final target = diaryState.dailyCalorieGoal.toInt();
+    final remaining = target - consumed;
+    final progress = target > 0 ? (consumed / target).clamp(0.0, 1.0) : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -199,7 +167,7 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        '$_totalCaloriesConsumed',
+                        '$consumed',
                         style: GoogleFonts.inter(
                           fontSize: 28,
                           fontWeight: FontWeight.w800,
@@ -207,7 +175,7 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
                         ),
                       ),
                       Text(
-                        ' / $_targetCalories kcal',
+                        ' / $target kcal',
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -218,13 +186,13 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    remainingCalories >= 0
-                        ? '$remainingCalories kcal remaining'
-                        : '${remainingCalories.abs()} kcal over budget',
+                    remaining >= 0
+                        ? '$remaining kcal remaining'
+                        : '${remaining.abs()} kcal over budget',
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: remainingCalories >= 0
+                      color: remaining >= 0
                           ? AaharTheme.safeGreen
                           : AaharTheme.avoidRed,
                     ),
@@ -267,27 +235,27 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
           const Divider(height: 1, color: AaharTheme.borderGrey),
           const SizedBox(height: 16),
 
-          // Macro Progress Bars
+          // Real Macro Progress Bars
           _buildMacroProgressBar(
             label: 'Carbs',
-            current: 180,
-            target: 250,
+            current: diaryState.totalCarbsConsumed,
+            target: diaryState.targetCarbsG,
             unit: 'g',
             color: AaharTheme.carbsAmber,
           ),
           const SizedBox(height: 10),
           _buildMacroProgressBar(
             label: 'Protein',
-            current: 48,
-            target: 60,
+            current: diaryState.totalProteinConsumed,
+            target: diaryState.targetProteinG,
             unit: 'g',
             color: AaharTheme.proteinBlue,
           ),
           const SizedBox(height: 10),
           _buildMacroProgressBar(
             label: 'Fat',
-            current: 42,
-            target: 65,
+            current: diaryState.totalFatConsumed,
+            target: diaryState.targetFatG,
             unit: 'g',
             color: AaharTheme.fatPurple,
           ),
@@ -303,7 +271,7 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
     required String unit,
     required Color color,
   }) {
-    final progress = (current / target).clamp(0.0, 1.0);
+    final progress = target > 0 ? (current / target).clamp(0.0, 1.0) : 0.0;
 
     return Column(
       children: [
@@ -319,7 +287,7 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
               ),
             ),
             Text(
-              '${current.toInt()}$unit / ${target.toInt()}$unit',
+              '${current.toStringAsFixed(1)}$unit / ${target.toInt()}$unit',
               style: GoogleFonts.inter(
                 fontSize: 12,
                 color: AaharTheme.textMuted,
@@ -341,14 +309,15 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
     );
   }
 
-  Widget _buildMealSection(Map<String, dynamic> meal) {
-    final mealType = meal['mealType'] as String;
-    final items = meal['items'] as List<Map<String, dynamic>>;
-
-    int mealCalories = 0;
-    for (final item in items) {
-      mealCalories += (item['calories'] as num).toInt();
-    }
+  Widget _buildMealSection({
+    required MealCategoryType categoryType,
+    required String categoryTitle,
+    required List<FoodLogEntry> logs,
+  }) {
+    final mealCalories = logs.fold<double>(
+      0.0,
+      (sum, item) => sum + item.caloriesConsumed,
+    ).toInt();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -367,7 +336,7 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
                 Row(
                   children: [
                     Text(
-                      mealType,
+                      categoryTitle,
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -402,28 +371,28 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
                     color: AaharTheme.primaryGreen,
                     size: 20,
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Add food item to $mealType')),
-                    );
-                  },
+                  onPressed: () => context.go('/scanner'),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            if (items.isEmpty)
+            if (logs.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'No items logged yet',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: AaharTheme.textLight,
-                  ),
+                child: Row(
+                  children: [
+                    Text(
+                      'No items logged for $categoryTitle',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: AaharTheme.textLight,
+                      ),
+                    ),
+                  ],
                 ),
               )
             else
-              ...items.map((item) {
+              ...logs.map((item) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6.0),
                   child: Row(
@@ -438,21 +407,47 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          item['name'] as String,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: AaharTheme.textBody,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.foodName,
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: AaharTheme.textBody,
+                              ),
+                            ),
+                            Text(
+                              '${item.servingQuantityG.toInt()}g • ${DateFormat('h:mm a').format(item.loggedAt)}',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: AaharTheme.textMuted,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       Text(
-                        '${item['calories']} kcal',
+                        '${item.caloriesConsumed.toInt()} kcal',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AaharTheme.textMuted,
                         ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: AaharTheme.avoidRed,
+                        ),
+                        onPressed: () {
+                          ref
+                              .read(diaryControllerProvider.notifier)
+                              .removeEntry(item.id);
+                        },
                       ),
                     ],
                   ),
@@ -463,5 +458,4 @@ class _DailyDiaryScreenState extends ConsumerState<DailyDiaryScreen> {
       ),
     );
   }
-
 }

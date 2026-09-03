@@ -140,6 +140,19 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
           .processImage(compressedFile);
       if (result != null && mounted) {
         context.push('/analysis', extra: result);
+      } else if (mounted) {
+        final err = ref.read(scannerControllerProvider).error;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AaharTheme.textHeadline,
+            content: Text(
+              err != null
+                  ? 'Analysis error: $err'
+                  : 'Could not extract nutrition from this label. Please snap a clearer photo of the nutrition table.',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -166,6 +179,19 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
           .processImage(compressed);
       if (result != null && mounted) {
         context.push('/analysis', extra: result);
+      } else if (mounted) {
+        final err = ref.read(scannerControllerProvider).error;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AaharTheme.textHeadline,
+            content: Text(
+              err != null
+                  ? 'Analysis error: $err'
+                  : 'Could not analyze selected photo. Please ensure ingredients or nutrients are legible.',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
