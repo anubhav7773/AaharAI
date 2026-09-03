@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/health_disclaimer_footer.dart';
 import '../../../core/auth/auth_state_provider.dart';
@@ -154,6 +155,40 @@ class WelcomeScreen extends ConsumerWidget {
                                 .signInWithGoogle();
                             if (success && context.mounted) {
                               context.go('/scanner');
+                            } else if (!success && context.mounted) {
+                              final authState = ref.read(authControllerProvider);
+                              final error = authState.error;
+                              if (error is AuthApiException &&
+                                  error.code == 'provider_disabled') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    backgroundColor: AaharTheme.textHeadline,
+                                    duration: Duration(seconds: 4),
+                                    content: Text(
+                                      'Google Sign-In is not enabled in your Supabase dashboard yet. Continuing as Guest...',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                );
+                                final guestOk = await ref
+                                    .read(authControllerProvider.notifier)
+                                    .signInAsGuest();
+                                if (guestOk && context.mounted) {
+                                  context.go('/scanner');
+                                }
+                              } else if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: AaharTheme.textHeadline,
+                                    content: Text(
+                                      error is AuthException
+                                          ? error.message
+                                          : 'Sign-in failed. Please try "Explore as Guest" below.',
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                );
+                              }
                             }
                           },
                           child: Padding(

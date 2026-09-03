@@ -45,12 +45,18 @@ class AuthService {
     }
   }
 
-  Future<AuthResponse> signInAsGuest() async {
+  Future<AuthResponse?> signInAsGuest() async {
     try {
       return await _supabase.auth.signInAnonymously();
+    } on AuthApiException catch (error) {
+      debugPrint(
+        'Supabase anonymous sign-in unavailable (${error.code}): ${error.message}',
+      );
+      // Fallback: Return null so caller can proceed in guest exploration mode
+      return null;
     } catch (error) {
       debugPrint('Guest Sign-In Error: $error');
-      rethrow;
+      return null;
     }
   }
 
