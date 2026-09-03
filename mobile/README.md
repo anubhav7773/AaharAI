@@ -3,13 +3,13 @@
 Flutter reads these public build inputs at compile time; it does not
 automatically load `.env.example` or any dotenv file:
 
-- `API_BASE_URL` — backend HTTP(S) URL. It defaults to
-  `http://10.0.2.2:8000`, which is for the Android emulator only.
+- `API_BASE_URL` — backend HTTP(S) URL. It defaults to the deployed backend
+  (`https://aaharai-backend.onrender.com`), so a phone build can reach it.
 - `SUPABASE_URL` — public Supabase project URL.
 - `SUPABASE_ANON_KEY` — public/anonymous Supabase key.
 
-The two Supabase values are required even when using the local API default.
-Invalid URLs and missing values are rejected before the app starts.
+The two Supabase values are required for authentication. If they are omitted,
+the app now opens a configuration screen instead of closing during startup.
 
 ## Run locally
 

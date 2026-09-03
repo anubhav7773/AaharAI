@@ -1,6 +1,6 @@
 /// Public, compile-time configuration supplied with `--dart-define`.
 class AppEnv {
-  static const _defaultApiBaseUrl = 'http://10.0.2.2:8000';
+  static const _defaultApiBaseUrl = 'https://aaharai-backend.onrender.com';
 
   final String apiBaseUrl;
   final String supabaseUrl;

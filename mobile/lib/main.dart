@@ -8,11 +8,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final env = AppEnv.fromEnvironment().validate();
-  await Supabase.initialize(
-    url: env.supabaseUrl,
-    publishableKey: env.supabaseAnonKey,
-  );
+  Object? startupError;
+  try {
+    final env = AppEnv.fromEnvironment().validate();
+    await Supabase.initialize(
+      url: env.supabaseUrl,
+      publishableKey: env.supabaseAnonKey,
+    );
+  } on Object catch (error) {
+    startupError = error;
+  }
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -20,17 +25,26 @@ Future<void> main() async {
     ),
   );
   runApp(
-    const ProviderScope(
-      child: AaharAiApp(),
+    ProviderScope(
+      child: AaharAiApp(startupError: startupError),
     ),
   );
 }
 
 class AaharAiApp extends ConsumerWidget {
-  const AaharAiApp({super.key});
+  const AaharAiApp({super.key, this.startupError});
+
+  final Object? startupError;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (startupError != null) {
+      return MaterialApp(
+        title: 'AaharAi',
+        debugShowCheckedModeBanner: false,
+        home: StartupErrorScreen(error: startupError!),
+      );
+    }
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
@@ -38,6 +52,28 @@ class AaharAiApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AaharTheme.lightTheme,
       routerConfig: router,
+    );
+  }
+}
+
+class StartupErrorScreen extends StatelessWidget {
+  const StartupErrorScreen({super.key, required this.error});
+
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'App configuration is incomplete.\n\n$error\n\n'
+            'Build with SUPABASE_URL and SUPABASE_ANON_KEY using --dart-define.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
     );
   }
 }
