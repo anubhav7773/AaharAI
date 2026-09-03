@@ -6,10 +6,16 @@ class AuthService {
   final SupabaseClient? _client;
   final GoogleSignIn _googleSignIn;
 
+  static const webClientId =
+      '264106799324-8ihu39lvmih7jpabct9sbllgen3ab9q6.apps.googleusercontent.com';
+
   AuthService({SupabaseClient? client, GoogleSignIn? googleSignIn})
       : _client = client,
-        _googleSignIn =
-            googleSignIn ?? GoogleSignIn(scopes: ['email', 'profile']);
+        _googleSignIn = googleSignIn ??
+            GoogleSignIn(
+              serverClientId: webClientId,
+              scopes: ['email', 'profile'],
+            );
 
   SupabaseClient get _supabase => _client ?? Supabase.instance.client;
 
