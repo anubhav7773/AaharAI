@@ -84,8 +84,8 @@ class GeminiInferenceService:
 
         candidate_models = list(
             dict.fromkeys([
-                self.model_name,
                 "gemini-3.5-flash",
+                self.model_name,
                 "gemini-3.5-flash-lite",
                 "gemini-flash-latest",
             ])
