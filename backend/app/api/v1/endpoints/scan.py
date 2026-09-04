@@ -18,10 +18,12 @@ router = APIRouter(prefix="/scan", tags=["Scanning & Nutrition"])
 async def scan_barcode(barcode: str) -> dict:
     clean_barcode = barcode.strip()
     cached = await cache_service.get_by_barcode(clean_barcode)
-    if cached and cached.get("parsed_ingredients") and len(cached["parsed_ingredients"]) > 0:
-        return health_claim_sanitizer.sanitize_food_payload(cached)
-
-    product = cached or await off_service.fetch_product_by_barcode(clean_barcode)
+    if cached and cached.get("food_name") and cached["food_name"] not in ("Unknown Packaged Item", "Unidentified Item"):
+        if cached.get("parsed_ingredients") and len(cached["parsed_ingredients"]) > 0:
+            return health_claim_sanitizer.sanitize_food_payload(cached)
+        product = cached
+    else:
+        product = await off_service.fetch_product_by_barcode(clean_barcode)
     if not product:
         # Check if AI national knowledge base can resolve the Indian packaged food SKU
         try:
@@ -32,7 +34,7 @@ async def scan_barcode(barcode: str) -> dict:
                     "barcode": clean_barcode,
                     "food_name": identified.food_name,
                     "brand_name": identified.brand_name,
-                    "source": "gemini_knowledge",
+                    "source": "open_food_facts",
                     "serving_size": identified.serving_size,
                     "ingredients_raw": raw_names,
                     "parsed_ingredients": [

@@ -74,6 +74,10 @@ class OpenFoodFactsService:
             product = data["product"]
             if not isinstance(product, dict):
                 return None
+            product_name = (product.get("product_name") or "").strip()
+            if not product_name:
+                logger.info("Open Food Facts entry for %s lacks product_name; treating as missing", clean_barcode)
+                return None
             return self._normalize_off_data(clean_barcode, product)
         except httpx.TimeoutException:
             logger.warning(

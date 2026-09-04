@@ -216,10 +216,12 @@ such as repeatedly heated oil or high-sodium sauces."""
     async def resolve_barcode_item(
         self, barcode: str
     ) -> Optional[GeminiFoodExtractionSchema]:
-        prompt = f"""Identify the Indian packaged food item associated with barcode '{barcode}'.
-If this barcode corresponds to a known Indian food or beverage SKU, provide the exact food name,
-brand name, serving size, FSSAI nutritional values per 100g, and deconstructed ingredients with safety ratings.
-If this barcode is not a known food product, set food_name to 'Unidentified Item'."""
+        prompt = (
+            f"Identify the packaged food, dairy, ice cream, snack, confection, or beverage product associated with barcode '{barcode}'.\n"
+            "Search your global, Indian, and regional FMCG barcode knowledge base (GS1 barcodes, retail databases, brands like Kwality, Amul, Vadilal, Mother Dairy, Havmor, Unilever, Nestle, Britannia, Parle, ITC, Haldiram's, etc.).\n"
+            "If this barcode corresponds to a known packaged food item (such as Kwality Vanilla Ice Cream 500ml for '6291053220017'), provide the exact product name, brand name, nutritional profile per 100g/serving, and deconstructed ingredients with plain language safety explanations and allergens.\n"
+            "If this barcode is completely unknown or not a food item, set food_name to 'Unidentified Item'."
+        )
         try:
             return await self._execute_with_retry(prompt)
         except Exception:
