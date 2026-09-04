@@ -25,7 +25,6 @@ dependencies:
 
   # Hardware, Camera & Scanning
   mobile_scanner: ^5.1.1
-  camera: ^0.10.5+9
   image_picker: ^1.1.0
   image: ^4.1.7
 
