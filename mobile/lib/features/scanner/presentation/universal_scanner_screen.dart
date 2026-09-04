@@ -23,12 +23,15 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
     with SingleTickerProviderStateMixin {
   int _selectedMode = 0; // 0 = Barcode Scan, 1 = Label OCR Photo
   final MobileScannerController _barcodeController = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
+    detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
   );
 
   bool _isProcessing = false;
   bool _isFlashOn = false;
+  String? _lastDetectedCode;
+  DateTime? _lastDetectedTime;
+  String _processingMessage = '';
 
   late AnimationController _laserAnimController;
   late Animation<double> _laserAnimation;
@@ -36,15 +39,15 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
   @override
   void initState() {
     super.initState();
-    // Warm up backend on camera open
+    // Warm up backend on camera open to ensure low latency
     ref.read(apiClientProvider).warmUpServer();
 
     _laserAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
 
-    _laserAnimation = Tween<double>(begin: 0.0, end: 260.0).animate(
+    _laserAnimation = Tween<double>(begin: 0.0, end: 200.0).animate(
       CurvedAnimation(
         parent: _laserAnimController,
         curve: Curves.easeInOut,
@@ -68,33 +71,284 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
 
   Future<void> _onBarcodeDetected(BarcodeCapture capture) async {
     if (_isProcessing || _selectedMode != 0) return;
-    final barcode = capture.barcodes.firstOrNull?.rawValue;
+    final barcode = capture.barcodes.firstOrNull?.rawValue?.trim();
     if (barcode == null || barcode.isEmpty) return;
 
-    setState(() => _isProcessing = true);
-    final result = await ref
-        .read(scannerControllerProvider.notifier)
-        .processBarcode(barcode);
-    setState(() => _isProcessing = false);
-
-    if (result != null && mounted) {
-      context.push('/analysis', extra: result);
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AaharTheme.textHeadline,
-          content: const Text(
-            'Product not in barcode database. Please snap a label photo.',
-            style: TextStyle(color: Colors.white),
-          ),
-          action: SnackBarAction(
-            label: 'Snap Label',
-            textColor: const Color(0xFF22C55E),
-            onPressed: () => setState(() => _selectedMode = 1),
-          ),
-        ),
-      );
+    // Prevent spamming the same barcode within 3 seconds
+    final now = DateTime.now();
+    if (_lastDetectedCode == barcode &&
+        _lastDetectedTime != null &&
+        now.difference(_lastDetectedTime!) < const Duration(seconds: 3)) {
+      return;
     }
+
+    _lastDetectedCode = barcode;
+    _lastDetectedTime = now;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = 'Scanned code: $barcode\nChecking food database...';
+    });
+
+    try {
+      final result = await ref
+          .read(scannerControllerProvider.notifier)
+          .processBarcode(barcode);
+
+      if (!mounted) return;
+
+      if (result != null) {
+        context.push('/analysis', extra: result);
+      } else {
+        _showBarcodeNotFoundSheet(barcode);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showBarcodeNotFoundSheet(barcode);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  void _showBarcodeNotFoundSheet(String barcode) {
+    final isNumericBarcode = RegExp(r'^\d{8,14}$').hasMatch(barcode);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: const BoxDecoration(
+                    color: AaharTheme.primarySurface,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isNumericBarcode
+                        ? Icons.qr_code_scanner_rounded
+                        : Icons.info_outline_rounded,
+                    color: AaharTheme.primaryGreen,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  isNumericBarcode
+                      ? 'Product Not in Barcode Registry'
+                      : 'Packaging / Batch Code Detected',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AaharTheme.textHeadline,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    barcode.length > 32
+                        ? '${barcode.substring(0, 32)}...'
+                        : barcode,
+                    style: GoogleFonts.sourceCodePro(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AaharTheme.textHeadline,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  isNumericBarcode
+                      ? 'This barcode is not yet indexed in Open Food Facts. You can instantly analyze this food by taking a photo of the nutrition label or ingredient list!'
+                      : 'This QR code contains manufacturing or batch details. To analyze this product, snap a photo of its ingredient list or nutrition facts with AI!',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: AaharTheme.textMuted,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AaharTheme.primaryGreen,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.camera_alt_rounded,
+                        color: Colors.white, size: 20),
+                    label: Text(
+                      'Snap Label & Analyze with AI',
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _captureLabelPhoto();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(
+                    'Scan Another Code',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: AaharTheme.textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showErrorSheet(
+    String message, {
+    required bool isRetryable,
+    VoidCallback? retryAction,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.sync_problem_rounded,
+                    color: Colors.amber.shade800,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Analysis Notice',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AaharTheme.textHeadline,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: AaharTheme.textMuted,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                if (isRetryable && retryAction != null)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AaharTheme.primaryGreen,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        retryAction();
+                      },
+                      child: Text(
+                        'Retry Analysis',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(
+                    'Dismiss',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: AaharTheme.textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _captureLabelPhoto() async {
@@ -108,33 +362,36 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
       );
       if (picked == null) return;
 
-      setState(() => _isProcessing = true);
+      setState(() {
+        _isProcessing = true;
+        _processingMessage =
+            'Optimizing photo & analyzing with Gemini AI...';
+      });
+
       final compressedFile =
           await ImageCompressor.compressForGemini(File(picked.path));
 
       final result = await ref
           .read(scannerControllerProvider.notifier)
           .processImage(compressedFile);
+
       if (result != null && mounted) {
         context.push('/analysis', extra: result);
       } else if (mounted) {
         final err = ref.read(scannerControllerProvider).error;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AaharTheme.textHeadline,
-            content: Text(
-              err != null
-                  ? 'Analysis error: $err'
-                  : 'Could not extract nutrition from this label. Please snap a clearer photo of the nutrition table.',
-              style: const TextStyle(color: Colors.white),
-            ),
-          ),
+        _showErrorSheet(
+          err != null
+              ? '$err'
+              : 'Could not extract nutrition information from this label. Please snap a clearer photo showing the nutrition facts table or ingredient list.',
+          isRetryable: true,
+          retryAction: _captureLabelPhoto,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to process label: $e')),
+        _showErrorSheet(
+          'Failed to capture photo: $e',
+          isRetryable: false,
         );
       }
     } finally {
@@ -147,33 +404,35 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
-    setState(() => _isProcessing = true);
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = 'Analyzing photo with Gemini AI...';
+    });
+
     try {
       final compressed =
           await ImageCompressor.compressForGemini(File(picked.path));
       final result = await ref
           .read(scannerControllerProvider.notifier)
           .processImage(compressed);
+
       if (result != null && mounted) {
         context.push('/analysis', extra: result);
       } else if (mounted) {
         final err = ref.read(scannerControllerProvider).error;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AaharTheme.textHeadline,
-            content: Text(
-              err != null
-                  ? 'Analysis error: $err'
-                  : 'Could not analyze selected photo. Please ensure ingredients or nutrients are legible.',
-              style: const TextStyle(color: Colors.white),
-            ),
-          ),
+        _showErrorSheet(
+          err != null
+              ? '$err'
+              : 'Could not analyze selected photo. Please ensure ingredients or nutrients are legible.',
+          isRetryable: true,
+          retryAction: _pickFromGallery,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gallery import error: $e')),
+        _showErrorSheet(
+          'Gallery import error: $e',
+          isRetryable: false,
         );
       }
     } finally {
@@ -195,82 +454,35 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
             ),
           ),
 
-          // Viewfinder reticle overlay
+          // Viewfinder Reticle Overlay
           Center(
-            child: SizedBox(
-              width: 280,
-              height: 280,
-              child: Stack(
-                children: [
-                  // Corner brackets
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: const Color(0xFF22C55E),
-                        width: 2.5,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                  ),
-                  // Animated laser sweep line
-                  AnimatedBuilder(
-                    animation: _laserAnimation,
-                    builder: (context, child) {
-                      return Positioned(
-                        top: _laserAnimation.value,
-                        left: 8,
-                        right: 8,
-                        child: Container(
-                          height: 2.5,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Colors.transparent,
-                                Color(0xFF22C55E),
-                                Colors.white,
-                                Color(0xFF22C55E),
-                                Colors.transparent,
-                              ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF22C55E)
-                                    .withValues(alpha: 0.8),
-                                blurRadius: 10,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
+            child: _selectedMode == 0
+                ? _buildBarcodeReticle()
+                : _buildPhotoReticle(),
           ),
 
-          // Instruction text below viewport
+          // Instruction Text Below Viewport
           Align(
             alignment: Alignment.center,
             child: Padding(
-              padding: const EdgeInsets.only(top: 340),
-              child: Text(
-                _selectedMode == 0
-                    ? 'Point at barcode'
-                    : 'Point at ingredient list & nutritional facts',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  shadows: const [
-                    Shadow(
-                      color: Colors.black87,
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
+              padding: EdgeInsets.only(top: _selectedMode == 0 ? 260 : 360),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _selectedMode == 0
+                      ? 'Align barcode inside frame or tap button below'
+                      : 'Point at ingredient list & nutritional facts',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -372,57 +584,48 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
                     ],
                   ),
 
-                  // Shutter Button (Active in OCR Mode)
-                  if (_selectedMode == 1)
-                    GestureDetector(
-                      onTap: _isProcessing ? null : _captureLabelPhoto,
-                      child: Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AaharTheme.primaryGreen,
-                            width: 4,
-                          ),
-                        ),
-                        child: Center(
-                          child: Container(
-                            width: 54,
-                            height: 54,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AaharTheme.primaryGreen,
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 26,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Column(
+                  // Interactive Shutter / AI Scan Button
+                  GestureDetector(
+                    onTap: _isProcessing ? null : _captureLabelPhoto,
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: 48,
-                          height: 48,
-                          decoration: const BoxDecoration(
-                            color: AaharTheme.primarySurface,
+                          width: 66,
+                          height: 66,
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF22C55E),
+                                Color(0xFF16A34A),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF22C55E)
+                                    .withValues(alpha: 0.4),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          child: const Icon(
-                            Icons.auto_awesome,
-                            color: AaharTheme.primaryGreen,
-                            size: 24,
+                          child: Center(
+                            child: Icon(
+                              _selectedMode == 0
+                                  ? Icons.camera_alt_rounded
+                                  : Icons.camera_alt,
+                              color: Colors.white,
+                              size: 30,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
-                          'Auto-Scanning',
+                          _selectedMode == 0 ? 'Snap & AI Scan' : 'Snap Label',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -431,6 +634,7 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
                         ),
                       ],
                     ),
+                  ),
 
                   // Street Food Intelligence Shortcut
                   Column(
@@ -459,36 +663,53 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
             ),
           ),
 
-          // Processing Loading Scrim
+          // Processing Fullscreen Loading Scrim
           if (_isProcessing)
             Container(
-              color: Colors.black.withValues(alpha: 0.7),
+              color: Colors.black.withValues(alpha: 0.75),
               child: Center(
                 child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 16,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const CircularProgressIndicator(
-                        color: AaharTheme.primaryGreen,
+                      const SizedBox(
+                        width: 42,
+                        height: 42,
+                        child: CircularProgressIndicator(
+                          color: AaharTheme.primaryGreen,
+                          strokeWidth: 3.5,
+                        ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 18),
                       Text(
-                        'AI Deconstructing Food Molecules...',
+                        _processingMessage.isNotEmpty
+                            ? _processingMessage
+                            : 'AI Analyzing Food Molecules...',
+                        textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           color: AaharTheme.textHeadline,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
-                        'Analyzing FSSAI additives & nutrition',
+                        'Analyzing FSSAI additives, allergens & nutrition',
+                        textAlign: TextAlign.center,
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: AaharTheme.textMuted,
@@ -500,6 +721,96 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBarcodeReticle() {
+    return SizedBox(
+      width: 290,
+      height: 200,
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: const Color(0xFF22C55E),
+                width: 2.5,
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+          AnimatedBuilder(
+            animation: _laserAnimation,
+            builder: (context, child) {
+              return Positioned(
+                top: _laserAnimation.value,
+                left: 8,
+                right: 8,
+                child: Container(
+                  height: 2.5,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Color(0xFF22C55E),
+                        Colors.white,
+                        Color(0xFF22C55E),
+                        Colors.transparent,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF22C55E).withValues(alpha: 0.8),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoReticle() {
+    return Container(
+      width: 300,
+      height: 320,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: const Color(0xFF22C55E),
+          width: 2.5,
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black45,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.crop_free_rounded,
+                  color: Color(0xFF22C55E), size: 16),
+              const SizedBox(width: 6),
+              Text(
+                'Nutrition Facts / Ingredients',
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
