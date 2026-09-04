@@ -82,7 +82,8 @@ async def scan_label_vision(file: UploadFile = File(...)) -> dict:
         ) from exc
 
     raw_names = " ".join(item.name for item in extracted.parsed_ingredients)
-    signature = cache_service.generate_signature_hash(raw_names or extracted.food_name)
+    signature_source = f"{extracted.brand_name or ''} {extracted.food_name} {raw_names}".strip()
+    signature = cache_service.generate_signature_hash(signature_source or extracted.food_name)
     cached = await cache_service.get_by_signature_hash(signature)
     if cached:
         return health_claim_sanitizer.sanitize_food_payload(cached)

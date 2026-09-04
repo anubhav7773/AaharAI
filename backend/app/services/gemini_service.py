@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 from typing import Any, Optional, Type
 
 from google import genai
@@ -65,12 +66,19 @@ class GeminiInferenceService:
     @staticmethod
     def _clean_json_text(text: str) -> str:
         cleaned = text.strip()
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-        elif cleaned.startswith("```"):
-            cleaned = cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
+        if "```json" in cleaned:
+            parts = cleaned.split("```json")
+            cleaned = parts[1].split("```")[0]
+        elif "```" in cleaned:
+            parts = cleaned.split("```")
+            cleaned = parts[1]
+
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            cleaned = cleaned[start : end + 1]
+
+        cleaned = re.sub(r",\s*([\]}])", r"\1", cleaned)
         return cleaned.strip()
 
     async def _execute_with_retry(
@@ -85,8 +93,8 @@ class GeminiInferenceService:
         candidate_models = list(
             dict.fromkeys([
                 "gemini-3.5-flash",
-                self.model_name,
                 "gemini-3.5-flash-lite",
+                self.model_name,
                 "gemini-flash-latest",
             ])
         )
@@ -189,8 +197,10 @@ Tree Nuts, Peanuts, Egg, Fish, and Crustaceans."""
     ) -> GeminiFoodExtractionSchema:
         image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
         prompt = (
-            "Analyze this food label. Extract the product, serving nutrients, ingredients, "
-            "plain-language safety explanations, and allergen warnings."
+            "Analyze this food packaging image strictly based ONLY on the visible text, brand logos, ingredients, and nutrition details.\n"
+            "Carefully read Hindi (Devanagari script), English, and Indian regional languages (e.g. 'बाल पुष्टिकर', 'आटा बेसन बर्फी प्रीमिक्स', 'नेफेड' / NAFED, '3-6 वर्ष आयु वर्ग के बच्चों के लिए', 'बाल विकास एवं पुष्टाहार विभाग').\n"
+            "Extract the exact product name, brand name, nutritional profile per 100g (or realistic ICMR-NIN baseline for this recipe if numbers are partially occluded), deconstructed ingredients (with plain conversational English explanations and safety ratings), and allergens.\n"
+            "CRITICAL ANTI-HALLUCINATION RULE: Never invent unrelated commercial food products (such as Maggi or instant noodles). Ground your analysis strictly in the actual product shown in the image. If the image is a QR code, barcode, or non-food surface without packaging, identify it accurately rather than fabricating food details."
         )
         return await self._execute_with_retry([image_part, prompt])
 

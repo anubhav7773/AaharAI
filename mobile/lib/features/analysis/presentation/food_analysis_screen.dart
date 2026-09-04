@@ -267,7 +267,7 @@ class _FoodAnalysisScreenState extends ConsumerState<FoodAnalysisScreen> {
   Widget _buildProductHeaderCard() {
     String sourceBadgeText = 'Verified via Open Food Facts';
     if (_data.source == 'gemini_vision') {
-      sourceBadgeText = 'Vision OCR • Gemini 2.5 Flash';
+      sourceBadgeText = 'Vision OCR • Gemini 3.5 Flash';
     } else if (_data.source == 'street_food') {
       sourceBadgeText = 'ICMR-NIN IFCT Baseline';
     }
