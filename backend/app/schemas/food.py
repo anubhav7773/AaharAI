@@ -44,6 +44,7 @@ class NutrientProfileSchema(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     calories: float = Field(
+        default=0.0,
         validation_alias=AliasChoices("calories", "calories_100g"),
         description="Energy in kcal per 100g or serving",
     )
@@ -85,7 +86,8 @@ class GeminiFoodExtractionSchema(BaseModel):
     food_name: str
     brand_name: Optional[str] = None
     serving_size: Optional[str] = None
-    nutrients: NutrientProfileSchema
+    nutrients: NutrientProfileSchema = Field(default_factory=NutrientProfileSchema)
     parsed_ingredients: List[ParsedIngredientSchema] = Field(default_factory=list)
     allergens: List[str] = Field(default_factory=list)
     preparation_insights: Optional[str] = None
+

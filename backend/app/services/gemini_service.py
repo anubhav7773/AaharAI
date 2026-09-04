@@ -15,12 +15,44 @@ from app.schemas.food import GeminiFoodExtractionSchema
 logger = logging.getLogger("aaharai.gemini")
 
 
+SCHEMA_INSTRUCTION = (
+    "\n\nCRITICAL RESPONSE FORMAT: You MUST return a single JSON object matching this schema:\n"
+    "{\n"
+    '  "food_name": "string (name of food item or dish)",\n'
+    '  "brand_name": "string or null",\n'
+    '  "serving_size": "string or null",\n'
+    '  "nutrients": {\n'
+    '    "calories": float (energy in kcal),\n'
+    '    "protein_g": float,\n'
+    '    "carbs_g": float,\n'
+    '    "fat_g": float,\n'
+    '    "saturated_fat_g": float or null,\n'
+    '    "added_sugar_g": float or null,\n'
+    '    "sodium_mg": float or null,\n'
+    '    "fiber_g": float or null\n'
+    "  },\n"
+    '  "parsed_ingredients": [\n'
+    "    {\n"
+    '      "name": "string (ingredient name)",\n'
+    '      "ins_code": "string or null (e.g. INS 322)",\n'
+    '      "safety": "safe" | "moderate" | "avoid",\n'
+    '      "plain_explanation": "string (plain language explanation)",\n'
+    '      "regulatory_footnote": "string or null (FSSAI/ICMR baseline)"\n'
+    "    }\n"
+    "  ],\n"
+    '  "allergens": ["string (e.g. Milk, Soy, Gluten, Peanuts)"],\n'
+    '  "preparation_insights": "string or null"\n'
+    "}\n"
+    "Return valid JSON only."
+)
+
+
 class GeminiInferenceService:
     def __init__(self) -> None:
         self._client: Optional[genai.Client] = None
         self.model_name = settings.GEMINI_MODEL_NAME
         self.system_instruction = settings.SYSTEM_INSTRUCTION
-        self.request_timeout_seconds = 20.0
+        self.request_timeout_seconds = 30.0
 
     @property
     def client(self) -> genai.Client:
@@ -58,10 +90,9 @@ class GeminiInferenceService:
                         model=self.model_name,
                         contents=contents,
                         config=types.GenerateContentConfig(
-                            system_instruction=self.system_instruction,
+                            system_instruction=self.system_instruction + SCHEMA_INSTRUCTION,
                             temperature=0.1,
                             response_mime_type="application/json",
-                            response_schema=schema,
                         ),
                     ),
                     timeout=self.request_timeout_seconds,
