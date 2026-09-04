@@ -1,6 +1,6 @@
 {
-    "name": "aahar_ai",
-    "short_name": "aahar_ai",
+    "name": "AaharAI",
+    "short_name": "AaharAI",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

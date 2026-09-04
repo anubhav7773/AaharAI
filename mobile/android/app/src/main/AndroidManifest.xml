@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.CAMERA"/>
 
     <application
-        android:label="aahar_ai"
+        android:label="AaharAI"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <meta-data
