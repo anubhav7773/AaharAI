@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     GEMINI_API_KEY: SecretStr
-    GEMINI_MODEL_NAME: str = "gemini-2.5-flash"
+    GEMINI_MODEL_NAME: str = "gemini-flash-latest"
     SUPABASE_URL: str
     SUPABASE_SERVICE_ROLE_KEY: SecretStr
     OFF_BASE_URL: str = "https://world.openfoodfacts.org/api/v2/product"
