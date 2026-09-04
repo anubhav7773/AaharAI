@@ -213,5 +213,17 @@ Deconstruct standard preparation ingredients and highlight hidden preparation in
 such as repeatedly heated oil or high-sodium sauces."""
         return await self._execute_with_retry(prompt)
 
+    async def resolve_barcode_item(
+        self, barcode: str
+    ) -> Optional[GeminiFoodExtractionSchema]:
+        prompt = f"""Identify the Indian packaged food item associated with barcode '{barcode}'.
+If this barcode corresponds to a known Indian food or beverage SKU, provide the exact food name,
+brand name, serving size, FSSAI nutritional values per 100g, and deconstructed ingredients with safety ratings.
+If this barcode is not a known food product, set food_name to 'Unidentified Item'."""
+        try:
+            return await self._execute_with_retry(prompt)
+        except Exception:
+            return None
+
 
 gemini_service = GeminiInferenceService()

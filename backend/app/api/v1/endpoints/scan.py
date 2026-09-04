@@ -18,11 +18,36 @@ router = APIRouter(prefix="/scan", tags=["Scanning & Nutrition"])
 async def scan_barcode(barcode: str) -> dict:
     clean_barcode = barcode.strip()
     cached = await cache_service.get_by_barcode(clean_barcode)
-    if cached:
+    if cached and cached.get("parsed_ingredients") and len(cached["parsed_ingredients"]) > 0:
         return health_claim_sanitizer.sanitize_food_payload(cached)
 
-    product = await off_service.fetch_product_by_barcode(clean_barcode)
+    product = cached or await off_service.fetch_product_by_barcode(clean_barcode)
     if not product:
+        # Check if AI national knowledge base can resolve the Indian packaged food SKU
+        try:
+            identified = await gemini_service.resolve_barcode_item(clean_barcode)
+            if identified and identified.food_name and "unidentified" not in identified.food_name.lower():
+                raw_names = " ".join(item.name for item in identified.parsed_ingredients)
+                fallback_product = {
+                    "barcode": clean_barcode,
+                    "food_name": identified.food_name,
+                    "brand_name": identified.brand_name,
+                    "source": "gemini_knowledge",
+                    "serving_size": identified.serving_size,
+                    "ingredients_raw": raw_names,
+                    "parsed_ingredients": [
+                        item.model_dump() for item in identified.parsed_ingredients
+                    ],
+                    "nutrients": identified.nutrients.model_dump(),
+                    "allergens": identified.allergens,
+                    "preparation_insights": identified.preparation_insights,
+                }
+                return health_claim_sanitizer.sanitize_food_payload(
+                    await cache_service.save_to_cache(fallback_product)
+                )
+        except Exception:
+            logger.exception("AI barcode resolution failed for %s", clean_barcode)
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Barcode not found in Open Food Facts database. "
@@ -30,19 +55,21 @@ async def scan_barcode(barcode: str) -> dict:
         )
 
     raw_ingredients = product.get("ingredients_raw")
-    if raw_ingredients:
+    if raw_ingredients or product.get("food_name"):
         try:
             extracted = await gemini_service.parse_ingredients_text(
-                food_name=product["food_name"],
-                raw_ingredients=raw_ingredients,
+                food_name=f"{product.get('brand_name') or ''} {product.get('food_name') or ''}".strip(),
+                raw_ingredients=raw_ingredients or "",
                 existing_nutrients=product.get("nutrients"),
             )
-            product["parsed_ingredients"] = [
-                ingredient.model_dump() for ingredient in extracted.parsed_ingredients
-            ]
-            product["allergens"] = sorted(
-                set(product.get("allergens", [])) | set(extracted.allergens)
-            )
+            if extracted.parsed_ingredients:
+                product["parsed_ingredients"] = [
+                    ingredient.model_dump() for ingredient in extracted.parsed_ingredients
+                ]
+            if extracted.allergens:
+                product["allergens"] = sorted(
+                    set(product.get("allergens", [])) | set(extracted.allergens)
+                )
         except Exception:
             logger.exception("Gemini enrichment failed; returning OFF data")
 
@@ -66,6 +93,26 @@ async def scan_label_vision(file: UploadFile = File(...)) -> dict:
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="Image size exceeds 5MB limit.",
         )
+
+    # 1. First check if uploaded image contains a readable 1D/2D barcode (e.g. Parle-G barcode)
+    try:
+        import zxingcpp
+        from io import BytesIO
+        from PIL import Image
+
+        pil_image = Image.open(BytesIO(image_bytes))
+        barcode_res = zxingcpp.read_barcode(pil_image)
+        if barcode_res and barcode_res.text:
+            detected_code = barcode_res.text.strip()
+            if detected_code.isdigit() and len(detected_code) in (8, 12, 13, 14):
+                logger.info("Decoded barcode %s directly from uploaded vision image", detected_code)
+                try:
+                    return await scan_barcode(detected_code)
+                except HTTPException as off_exc:
+                    if off_exc.status_code != status.HTTP_404_NOT_FOUND:
+                        raise
+    except Exception as barcode_err:
+        logger.debug("Barcode check on uploaded vision image skipped: %s", barcode_err)
 
     try:
         extracted: GeminiFoodExtractionSchema = (

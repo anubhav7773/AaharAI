@@ -406,10 +406,39 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
 
     setState(() {
       _isProcessing = true;
-      _processingMessage = 'Analyzing photo with Gemini AI...';
+      _processingMessage = 'Scanning image for barcode or nutrition label...';
     });
 
     try {
+      // 1. Try decoding barcode directly from the selected gallery image
+      try {
+        final barcodeCapture =
+            await _barcodeController.analyzeImage(picked.path);
+        final detectedBarcode =
+            barcodeCapture?.barcodes.firstOrNull?.rawValue?.trim();
+        if (detectedBarcode != null && detectedBarcode.isNotEmpty) {
+          setState(() {
+            _processingMessage =
+                'Found barcode: $detectedBarcode\nFetching verified product data...';
+          });
+          final result = await ref
+              .read(scannerControllerProvider.notifier)
+              .processBarcode(detectedBarcode);
+          if (result != null && mounted) {
+            context.push('/analysis', extra: result);
+            return;
+          }
+        }
+      } catch (barcodeErr) {
+        debugPrint('Gallery barcode detection skipped: $barcodeErr');
+      }
+
+      // 2. If no barcode or barcode not in DB, analyze packaging with Gemini AI
+      setState(() {
+        _processingMessage =
+            'Analyzing nutrition label & ingredients with Gemini AI...';
+      });
+
       final compressed =
           await ImageCompressor.compressForGemini(File(picked.path));
       final result = await ref
