@@ -79,15 +79,25 @@ class GeminiInferenceService:
         schema: Type[GeminiFoodExtractionSchema] = GeminiFoodExtractionSchema,
         max_retries: int = 3,
     ) -> GeminiFoodExtractionSchema:
-        delay = 2.0
+        delay = 1.5
         last_exception: Optional[Exception] = None
 
+        candidate_models = list(
+            dict.fromkeys([
+                self.model_name,
+                "gemini-3.5-flash",
+                "gemini-3.5-flash-lite",
+                "gemini-flash-latest",
+            ])
+        )
+
         for attempt in range(1, max_retries + 1):
+            current_model = candidate_models[(attempt - 1) % len(candidate_models)]
             try:
                 response = await asyncio.wait_for(
                     asyncio.to_thread(
                         self.client.models.generate_content,
-                        model=self.model_name,
+                        model=current_model,
                         contents=contents,
                         config=types.GenerateContentConfig(
                             system_instruction=self.system_instruction + SCHEMA_INSTRUCTION,
@@ -106,7 +116,8 @@ class GeminiInferenceService:
             except asyncio.TimeoutError as exc:
                 last_exception = exc
                 logger.warning(
-                    "Gemini API timed out after %.1fs (attempt %d/%d)",
+                    "Gemini API model %s timed out after %.1fs (attempt %d/%d)",
+                    current_model,
                     self.request_timeout_seconds,
                     attempt,
                     max_retries,
@@ -123,7 +134,8 @@ class GeminiInferenceService:
                 if not is_transient:
                     raise
                 logger.warning(
-                    "Gemini transient API error (%s); backing off %.1fs (attempt %d/%d)",
+                    "Gemini model %s transient error (%s); backing off %.1fs to next candidate model (attempt %d/%d)",
+                    current_model,
                     code or str(exc),
                     delay,
                     attempt,
@@ -132,7 +144,8 @@ class GeminiInferenceService:
             except (ValueError, TypeError, json.JSONDecodeError) as exc:
                 last_exception = exc
                 logger.warning(
-                    "Gemini response validation failed (attempt %d/%d): %s",
+                    "Gemini model %s response validation failed (attempt %d/%d): %s",
+                    current_model,
                     attempt,
                     max_retries,
                     exc,
@@ -140,11 +153,13 @@ class GeminiInferenceService:
             except Exception as exc:
                 last_exception = exc
                 logger.warning(
-                    "Gemini inference failed (attempt %d/%d): %s",
+                    "Gemini model %s inference failed (attempt %d/%d): %s",
+                    current_model,
                     attempt,
                     max_retries,
                     exc,
                 )
+
 
             if attempt < max_retries:
                 await asyncio.sleep(delay)
