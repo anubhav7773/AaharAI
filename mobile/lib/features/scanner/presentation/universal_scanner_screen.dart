@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -28,8 +27,6 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
     facing: CameraFacing.back,
   );
 
-  CameraController? _photoController;
-  List<CameraDescription>? _cameras;
   bool _isProcessing = false;
   bool _isFlashOn = false;
 
@@ -41,7 +38,6 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
     super.initState();
     // Warm up backend on camera open
     ref.read(apiClientProvider).warmUpServer();
-    _initPhotoCamera();
 
     _laserAnimController = AnimationController(
       vsync: this,
@@ -56,43 +52,22 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
     );
   }
 
-  Future<void> _initPhotoCamera() async {
-    try {
-      _cameras = await availableCameras();
-      if (_cameras != null && _cameras!.isNotEmpty) {
-        _photoController = CameraController(
-          _cameras![0],
-          ResolutionPreset.high,
-          enableAudio: false,
-        );
-        await _photoController!.initialize();
-        if (mounted) setState(() {});
-      }
-    } catch (_) {}
-  }
-
   @override
   void dispose() {
     _barcodeController.dispose();
-    _photoController?.dispose();
     _laserAnimController.dispose();
     super.dispose();
   }
 
   Future<void> _toggleTorch() async {
     setState(() => _isFlashOn = !_isFlashOn);
-    if (_selectedMode == 0) {
+    try {
       await _barcodeController.toggleTorch();
-    } else if (_photoController != null &&
-        _photoController!.value.isInitialized) {
-      await _photoController!.setFlashMode(
-        _isFlashOn ? FlashMode.torch : FlashMode.off,
-      );
-    }
+    } catch (_) {}
   }
 
   Future<void> _onBarcodeDetected(BarcodeCapture capture) async {
-    if (_isProcessing) return;
+    if (_isProcessing || _selectedMode != 0) return;
     final barcode = capture.barcodes.firstOrNull?.rawValue;
     if (barcode == null || barcode.isEmpty) return;
 
@@ -123,17 +98,19 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
   }
 
   Future<void> _captureLabelPhoto() async {
-    if (_photoController == null ||
-        !_photoController!.value.isInitialized ||
-        _isProcessing) {
-      return;
-    }
+    if (_isProcessing) return;
 
-    setState(() => _isProcessing = true);
     try {
-      final xFile = await _photoController!.takePicture();
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 92,
+      );
+      if (picked == null) return;
+
+      setState(() => _isProcessing = true);
       final compressedFile =
-          await ImageCompressor.compressForGemini(File(xFile.path));
+          await ImageCompressor.compressForGemini(File(picked.path));
 
       final result = await ref
           .read(scannerControllerProvider.notifier)
@@ -210,21 +187,12 @@ class _UniversalScannerScreenState extends ConsumerState<UniversalScannerScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Dynamic Camera Viewport
+          // Live Camera Viewport (Active in both Barcode and Photo modes)
           Positioned.fill(
-            child: _selectedMode == 0
-                ? MobileScanner(
-                    controller: _barcodeController,
-                    onDetect: _onBarcodeDetected,
-                  )
-                : (_photoController != null &&
-                        _photoController!.value.isInitialized)
-                    ? CameraPreview(_photoController!)
-                    : const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF22C55E),
-                        ),
-                      ),
+            child: MobileScanner(
+              controller: _barcodeController,
+              onDetect: _onBarcodeDetected,
+            ),
           ),
 
           // Viewfinder reticle overlay
