@@ -15,9 +15,9 @@ class ApiClient {
         Dio(
           BaseOptions(
             baseUrl: (env ?? AppEnv.fromEnvironment()).validate().apiBaseUrl,
-            connectTimeout: const Duration(seconds: 15),
-            receiveTimeout: const Duration(seconds: 20),
-            sendTimeout: const Duration(seconds: 20),
+            connectTimeout: const Duration(seconds: 45),
+            receiveTimeout: const Duration(seconds: 45),
+            sendTimeout: const Duration(seconds: 45),
             headers: {
               'Accept': 'application/json',
               'X-Client-Platform':
@@ -59,10 +59,15 @@ class ApiClient {
       DioExceptionType.connectionTimeout,
       DioExceptionType.sendTimeout,
       DioExceptionType.receiveTimeout,
-      DioExceptionType.connectionError,
     }.contains(error.type)) {
+      return ServerWarmingException(
+        'Server is waking up. Please retry in a few seconds...',
+      );
+    }
+    if (error.type == DioExceptionType.connectionError) {
       return NetworkException();
     }
+
 
     final response = error.response;
     if (response != null) {
